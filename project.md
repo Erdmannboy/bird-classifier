@@ -227,3 +227,313 @@ wahrscheinlich am meisten bringen. Technisch hat uns BirdNET zusammen mit PyTorc
 zunächst Konflikte beschert, die wir über einen Subprozess gelöst haben. Und auch wenn
 wir den ML-Teil stark mit KI erarbeitet haben, haben wir gerade an den Daten- und
 Problemstellen viel darüber gelernt, worauf es bei so einem Projekt wirklich ankommt.
+
+
+
+
+
+
+
+
+
+ML4B Project Documentation – Bird Species Classifier
+
+1. Project Idea
+
+Wir haben ein eigenes Machine-Learning-System entwickelt, das Vogelarten anhand von Audioaufnahmen erkennt. Unterschieden werden drei heimische Arten – Amsel, Kohlmeise und Rotkehlchen – sowie eine vierte Klasse „Background“, die verwendet wird, wenn kein relevanter Vogelgesang vorhanden ist. Dadurch kann das System nicht nur Vogelarten erkennen, sondern auch zwischen Vogelgesang und Hintergrundgeräuschen unterscheiden.
+
+Zusätzlich wurde eine Streamlit-Anwendung entwickelt, in der Nutzer eine Audiodatei hochladen oder direkt aufnehmen können. Die Anwendung zeigt ein Mel-Spektrogramm der Aufnahme an, führt eine Klassifikation durch und vergleicht das Ergebnis mit dem bekannten Referenzsystem BirdNET.
+
+Für die Entwicklung wurden moderne KI-Werkzeuge als Unterstützung genutzt. Der Schwerpunkt des Projekts lag jedoch auf der Datensammlung, Datenaufbereitung, Evaluation und dem Verständnis des gesamten Machine-Learning-Prozesses.
+
+⸻
+
+2. Business Understanding
+
+Dieses Projekt stellt einen Proof of Concept dar und soll zeigen, dass eine automatische Vogelerkennung anhand kurzer Tonaufnahmen grundsätzlich möglich ist.
+
+Problem
+
+Die Bestimmung von Vogelarten anhand ihres Gesangs erfordert normalerweise Erfahrung und Fachwissen. Für viele Menschen ist es schwierig, Vogelstimmen zuverlässig zu unterscheiden.
+
+Zielgruppe
+
+Das System richtet sich an naturinteressierte Personen, Hobby-Ornithologen sowie Garten- und Tierliebhaber, die schnell eine Einschätzung zu einer Vogelaufnahme erhalten möchten.
+
+Nutzen
+
+Das System kann innerhalb weniger Sekunden eine Aufnahme analysieren und eine Einschätzung zur wahrscheinlichsten Vogelart liefern. Durch die zusätzliche Background-Klasse kann das Modell außerdem erkennen, wenn keiner der trainierten Zielvögel hörbar ist.
+
+⸻
+
+3. Data Understanding
+
+Datenquelle
+
+Als Datenquelle wurde die öffentliche Plattform Xeno-Canto verwendet, die weltweit frei verfügbare Vogelaufnahmen bereitstellt.
+
+Der Download wurde mithilfe der Xeno-Canto-API und des Skripts bird_data.py automatisiert. Dabei wurden gezielt hochwertige Aufnahmen mit Vogelgesang und einer Mindestlänge von 20 Sekunden heruntergeladen.
+
+Gesammelt wurden Aufnahmen von:
+
+* Amsel (Common Blackbird)
+* Kohlmeise (Great Tit)
+* Rotkehlchen (European Robin)
+
+Zusätzlich wurden Aufnahmen anderer Vogelarten wie:
+
+* Taube
+* Krähe
+* Spatz
+
+heruntergeladen, um später schwierige Negativbeispiele für die Background-Klasse zu erzeugen.
+
+Die Rohdaten lagen als MP3-Dateien vor und waren häufig mehrere Minuten lang.
+
+Features
+
+Da ausschließlich Audiodaten verwendet werden, werden die Aufnahmen zunächst in sogenannte Mel-Spektrogramme umgewandelt.
+
+Ein Mel-Spektrogramm stellt Frequenzen über die Zeit dar und kann als Bild betrachtet werden. Dadurch können Methoden der Bildklassifikation auf Audiodaten übertragen werden.
+
+Verwendete Parameter:
+
+* Sampling Rate: 32 kHz
+* 128 Mel-Bänder
+* Maximale Frequenz: 16 kHz
+* Feste Breite: 313 Zeit-Frames
+
+Labels
+
+Die drei Zielarten wurden direkt anhand der heruntergeladenen Aufnahmen gelabelt:
+
+Klasse	Label
+Amsel	0
+Kohlmeise	1
+Rotkehlchen	2
+Background	3
+
+Für die Klasse Background wurden keine manuellen Labels erstellt.
+
+Stattdessen wurde das vortrainierte Google-Modell YAMNet verwendet. YAMNet erkennt nicht die Vogelart, sondern schätzt lediglich, wie wahrscheinlich es ist, dass ein Vogel hörbar ist.
+
+Dadurch konnten Clips automatisch als:
+
+* Background
+* Hard Negative
+
+eingestuft werden.
+
+Hard Negatives enthalten bewusst andere Vogelarten wie Tauben, Krähen oder Spatzen und helfen dem Modell dabei, Zielvögel von anderen Vögeln zu unterscheiden.
+
+Risiken
+
+Mögliche Probleme waren:
+
+* Hintergrundgeräusche
+* Stille innerhalb von Aufnahmen
+* falsch gelabelte Daten
+* Ungleichgewicht zwischen Klassen
+* Data Leakage durch mehrfach verwendete Originalaufnahmen
+
+⸻
+
+4. Related Work
+
+Für das Projekt wurden verschiedene etablierte Werkzeuge kombiniert:
+
+Werkzeug	Zweck
+Xeno-Canto	Datenquelle
+YAMNet	Qualitätskontrolle und Erzeugung der Background-Klasse
+BirdNET	Vergleichssystem
+librosa	Audiobearbeitung
+PyTorch	Modelltraining
+scikit-learn	Datensplitting und Evaluation
+Streamlit	Benutzeroberfläche
+
+⸻
+
+5. Data Preparation
+
+Problem der ersten Datenbasis
+
+Zu Beginn wurden die langen Aufnahmen lediglich in 5-Sekunden-Segmente zerlegt.
+
+Obwohl dies grundsätzlich funktionierte, enthielten viele dieser Clips:
+
+* Stille
+* Wind
+* Rauschen
+* andere Hintergrundgeräusche
+
+Da diese Clips trotzdem als Vogelaufnahmen gelabelt wurden, lernte das erste Modell teilweise falsche Muster.
+
+Tests mit stillen Aufnahmen führten teilweise zu sehr hohen Vogelwahrscheinlichkeiten.
+
+Verbesserung durch YAMNet
+
+Deshalb wurde die Strategie angepasst.
+
+Mit cut_audio.py werden die langen Aufnahmen weiterhin in 5-Sekunden-Clips zerlegt. Anschließend analysiert YAMNet jeden Clip und bewertet die Wahrscheinlichkeit, dass tatsächlich ein Vogel hörbar ist.
+
+Auf Basis dieses Scores werden Clips automatisch in:
+
+* Vogelaufnahmen
+* Background
+* Hard Negatives
+
+unterteilt.
+
+Dadurch entstand ein deutlich saubererer Datensatz.
+
+Feature-Erzeugung
+
+Jeder Clip wird anschließend in ein Mel-Spektrogramm umgewandelt.
+
+Zur Vereinheitlichung:
+
+* werden zu kurze Aufnahmen mit Nullen aufgefüllt,
+* werden zu lange Aufnahmen abgeschnitten,
+* werden die Daten normalisiert.
+
+Die Eingabegröße des Modells beträgt:
+
+(1, 128, 313)
+
+Datensplitting
+
+Mit build_dataset.py werden Trainings-, Validierungs- und Testdaten erstellt.
+
+Dabei werden zunächst alle Clips nach ihrer ursprünglichen Aufnahme-ID gruppiert.
+
+Anschließend erfolgt ein Split von:
+
+* 70 % Training
+* 15 % Validation
+* 15 % Test
+
+Dadurch wird verhindert, dass Clips derselben Originalaufnahme gleichzeitig in Trainings- und Testdaten landen.
+
+⸻
+
+6. Modeling
+
+Erstes Modell
+
+Die erste Modellversion befindet sich im Notebook:
+
+notebooks/notebook.ipynb
+
+Dieses Modell zeigte das zuvor beschriebene Problem, dass häufig Stille oder Hintergrundgeräusche gelernt wurden.
+
+Finales Modell
+
+Das finale Modell befindet sich in:
+
+notebooks/bird_training.ipynb
+
+Verwendet wurde ein eigenes Convolutional Neural Network (CNN) auf Basis von PyTorch.
+
+Architektur:
+
+* 4 Convolution-Blöcke
+* Batch Normalization
+* ReLU-Aktivierung
+* Max Pooling
+* Global Average Pooling
+* Dropout
+* Linear Layer
+
+Das Modell klassifiziert vier Klassen:
+
+* Amsel
+* Kohlmeise
+* Rotkehlchen
+* Background
+
+Zusätzlich wird während des Trainings SpecAugment eingesetzt, um Overfitting zu reduzieren.
+
+Trainingsparameter:
+
+* 20 Epochen
+* Batchgröße: 32
+* AdamW Optimizer
+* Learning Rate: 0.001
+* Label Smoothing: 0.1
+* Cosine Annealing Scheduler
+
+Das jeweils beste Modell wird als:
+
+model_best.pth
+
+gespeichert.
+
+Zusätzlich existiert:
+
+model.pth
+
+als weitere gespeicherte Modellversion aus dem Entwicklungsprozess.
+
+⸻
+
+7. Evaluation
+
+Die Bewertung erfolgt auf einem zuvor unberührten Testdatensatz.
+
+Das beste Modell erreichte:
+
+Test Accuracy: 87.87 %
+
+Klassenweise Genauigkeit
+
+Klasse	Accuracy
+Amsel	93.62 %
+Kohlmeise	86.63 %
+Rotkehlchen	88.38 %
+Background	82.61 %
+
+Interpretation
+
+Die Amsel wird am zuverlässigsten erkannt.
+
+Die größte Schwierigkeit besteht darin, Rotkehlchen von Kohlmeisen zu unterscheiden.
+
+Die Background-Klasse ist erwartungsgemäß die schwierigste Klasse, da sie sehr unterschiedliche Geräusche zusammenfasst.
+
+Für ein selbst trainiertes CNN mit vier Klassen stellt das Ergebnis eine solide Leistung dar.
+
+⸻
+
+8. Deployment
+
+Die Anwendung wurde als Streamlit-App umgesetzt.
+
+Start:
+
+streamlit run app.py
+
+Die App ermöglicht:
+
+* Upload von WAV-Dateien
+* Live-Aufnahmen über das Mikrofon
+* Anzeige des Mel-Spektrogramms
+* Auswahl eines 5-Sekunden-Fensters
+* Vorhersage durch das eigene CNN
+* Vergleich mit BirdNET
+
+Die Vorverarbeitung in der App entspricht exakt der Vorverarbeitung während des Trainings.
+
+⸻
+
+9. Projektstruktur
+
+data/
+│
+├── .gitkeep
+│
+└── (hier werden die Audiodaten gespeichert)
+data_splits/
+│
+├── .gitkeep
+│
+└── (hier werden train.csv, val.csv
