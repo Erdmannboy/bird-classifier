@@ -127,7 +127,22 @@ Klassenverteilung im Trainingsset: ≈ 1.888 Amsel, 1.939 Kohlmeise,
 
 ---
 
-## 3. Data Preparation
+## 3. Related Work
+
+Dieses Projekt baut auf bestehenden Werkzeugen und Datensätzen zur audiobasierten Klassifikation von Vogelarten auf.
+
+* **Xeno-Canto** stellt öffentlich zugängliche Vogelstimmenaufnahmen bereit und dient als zentrale Datenquelle für dieses Projekt.
+* **YAMNet** wird als vortrainierter Audio-Event-Klassifikator genutzt, um Hintergrundaufnahmen zu filtern und Segmente mit vogelähnlichen Geräuschen zu erkennen.
+* **BirdNET** wird in der Streamlit-Anwendung als externes Referenzsystem verwendet. BirdNET wird nicht zum Training unseres Modells genutzt, sondern dient dazu, die Vorhersagen unseres CNN-Modells mit einem etablierten System zur Vogelstimmenerkennung zu vergleichen.
+* **librosa** wird zum Laden der Audiodateien und zur Erzeugung der Mel-Spektrogramme verwendet.
+* **PyTorch** wird zur Implementierung und zum Training des eigenen CNN-Modells genutzt.
+* **Streamlit** wird verwendet, um das Modell über eine interaktive Webanwendung nutzbar zu machen.
+
+Der wichtigste Unterschied zu BirdNET besteht darin, dass unser Modell bewusst auf drei lokale Vogelarten und eine Background-Klasse beschränkt ist. Dadurch ist die Klassifikationsaufgabe kleiner, besser interpretierbar und für einen Proof of Concept im Rahmen des Kurses geeignet.
+
+---
+
+## 4. Data Preparation
 
 ### Schritt 1 — Zuschneiden in Clips
 
@@ -193,7 +208,7 @@ Spalten: `path`, `label`, `class_name`, `recording_id`
 
 ---
 
-## 4. Modeling
+## 5. Modeling
 
 ### Architektur — BirdCNN (V3)
 
@@ -252,7 +267,7 @@ Daraus entstand die Idee zur YAMNet-Bereinigung und der Background-Klasse.
 
 ---
 
-## 5. Evaluation
+## 6. Evaluation
 
 ### Methode
 
@@ -308,7 +323,7 @@ Metriken berechnet mit `sklearn.metrics` in `notebooks/bird_training.ipynb`.
 
 ---
 
-## 6. Deployment
+## 7. Deployment
 
 ### Anwendung
 
@@ -363,3 +378,10 @@ stdout zurückgegeben. Implementiert in `app.py` als `_BIRDNET_SUBPROCESS_SCRIPT
 > TODO: Cloud-Deployment (z. B. Streamlit Cloud, Hugging Face Spaces) evaluieren.
 
 **Hauptdatei:** `app.py`, `project.md` (Abschnitt 8)
+
+---
+
+## 8. Future Work
+
+Mögliche Erweiterungen wären ein Docker-Image für eine reproduzierbare Laufzeitumgebung und ein Cloud-Deployment, zum Beispiel über Streamlit Cloud oder Hugging Face Spaces. Für die aktuelle Kursabgabe wird die Anwendung lokal über `streamlit run app.py` ausgeführt.
+
