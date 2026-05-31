@@ -10,14 +10,8 @@ Dazu kommt eine kleine Streamlit-App, in der man eine Aufnahme hochladen oder di
 aufnehmen kann; sie zeigt das Mel-Spektrogramm und gibt die wahrscheinliche Vogelart
 aus und vergleicht sie mit dem bekannten System BirdNET.
 
-Ehrlich gesagt: Den eigentlichen ML-Teil – also das Netz aufbauen und trainieren –
-haben wir größtenteils mit Hilfe von KI gelöst. Was wir dagegen wirklich selbst
-erarbeitet haben, war der ganze Weg davor: woher man überhaupt brauchbare Daten
-bekommt, wie man die langen Aufnahmen sinnvoll zuschneidet, und vor allem die
-Probleme, auf die wir dabei gestoßen sind (z. B. dass das erste Modell auf Stille
-trainiert hat). Genau an diesen Stellen haben wir am meisten verstanden – wie wichtig
-saubere Daten sind, warum man den Datensatz richtig aufteilen muss und wie man ein
-Modell überhaupt sinnvoll bewertet.
+Bei der technischen Umsetzung haben wir KI-gestützte Werkzeuge als Unterstützung genutzt, insbesondere bei der Strukturierung des Trainingscodes und bei der Fehlersuche. Die zentralen fachlichen Entscheidungen lagen jedoch bei uns: Auswahl der Datenquelle, Definition der Zielklassen, Aufbau der Datenpipeline, Umgang mit fehlerhaften oder stillen Audioclips, Einführung der Background-Klasse, Vermeidung von Data Leakage durch aufnahmebasiertes Splitting sowie Interpretation der Evaluationsergebnisse. Gerade dadurch wurde deutlich, dass die Qualität der Daten und der Aufbau der Pipeline für dieses Projekt wichtiger waren als die reine Modellarchitektur.
+
 
 ## 2. Business Understanding
 

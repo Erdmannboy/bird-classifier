@@ -8,6 +8,22 @@ CNN-Vorhersage dem bekannten System BirdNET direkt gegenüber.
 
 ---
 
+## Quickstar for Reviewers
+
+Dieses Repository enthält eine lauffähige Streamlit-Anwendung sowie ein bereits trainiertes PyTorch-Modell.
+
+git clone https://github.com/sommedav/bird-classifier.git
+cd bird-classifier
+pip install -r requirements.txt
+python setup_check.py
+streamlit run app.py
+
+Nach dem Start der App kann eine WAV-Datei hochgeladen oder direkt im Browser eine Audioaufnahme erstellt werden. Die App wählt daraus ein 5-sekündiges Audiofenster aus, wandelt dieses in ein Mel-Spektrogramm um und sagt anschließend eine von vier Klassen vorher: Amsel, Kohlmeise, Rotkehlchen oder Background.
+
+Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des Projekts. Die ursprünglichen Trainingsdaten sind nicht im Repository enthalten, da sie zu groß sind und die Audiodateien den jeweiligen Lizenzen der Originalaufnahmen unterliegen. Die Datenpipeline kann mit den Skripten im Ordner `src/` nachvollzogen werden.
+
+---
+
 ## Features
 
 - Klassifikation von 5-Sekunden-Audioausschnitten in 4 Klassen
@@ -170,7 +186,8 @@ Bewertet auf dem unberührten Test-Set (2.086 Clips):
 
 ## Tests
 
-> TODO: Keine automatisierte Test-Suite vorhanden.
+Automatisierte Unit-Tests sind in diesem Projekt nicht enthalten. Zur Überprüfung der grundlegenden Lauffähigkeit kann jedoch `setup_check.py` als Smoke-Test ausgeführt werden. Zusätzlich kann die Streamlit-Anwendung lokal mit `streamlit run app.py` gestartet werden, um die Modellinferenz über die Weboberfläche zu testen.
+
 
 Umgebungscheck:
 
@@ -192,7 +209,8 @@ python setup_check.py
 
 ## Lizenz
 
-> TODO: Keine Lizenz-Datei vorhanden. Bitte `LICENSE` ergänzen.
+Der Quellcode dieses Projekts wurde für die Nutzung im Rahmen des ML4B-Kurses erstellt. Die verwendeten Audiodateien stammen von Xeno-Canto und unterliegen weiterhin den jeweiligen Lizenzen der Originalaufnahmen. Die Lizenz des Quellcodes ist daher getrennt von den Lizenzen der Audiodaten zu betrachten.
+
 
 ## Quellen / Danksagungen
 
