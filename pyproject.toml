@@ -2,7 +2,7 @@
 name = "bird-classifier"
 version = "0.1.0"
 description = "Vogelgesang-Klassifikator: Amsel, Kohlmeise, Rotkehlchen, Background"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     # Grundlagen
     "numpy",

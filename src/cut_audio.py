@@ -10,12 +10,14 @@ import numpy as np
 import librosa
 import soundfile as sf
 
-# --- ANPASSEN ----------------------------------------------------------------
+# --- ANPASSEN , je nach Vogel--------------------------------------------------
 BIRD_NAME = "Amsel"
 
 BASE_DIR = Path("data")
 INPUT_DIR  = BASE_DIR / "Amsel"      / "files"
 OUTPUT_DIR = BASE_DIR / "Amsel"      / "clips"   # Hard Negatives (klar hoerbarer Vogel)
+
+# so lassen: 
 OUTPUT_BG  = BASE_DIR / "Background" / "clips"   # Background-Clips (schwacher Vogelanteil)
 
 TARGET_LENGTH = 5      # Sekunden

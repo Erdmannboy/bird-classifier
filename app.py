@@ -413,7 +413,7 @@ if audio_source is None:
         st.info(
             "ℹ️ **BirdNET nicht aktiv.** Installiere `birdnetlib`, damit die App "
             "beide Modelle nebeneinander vergleichen kann:  \n"
-            "```bash\npip install birdnetlib\n```"
+            "```bash\nuv sync --extra birdnet\n```"
         )
 
 # ======================================
@@ -539,7 +539,7 @@ if audio_source is not None:
                 <div class="result-tag birdnet">BirdNET</div>
                 <div class="result-emoji">📦</div>
                 <div class="result-name" style="font-size:1.1rem;">birdnetlib nicht installiert</div>
-                <div class="result-scientific">pip install birdnetlib</div>
+                <div class="result-scientific">uv sync --extra birdnet</div>
             </div>
             """, unsafe_allow_html=True)
         elif bn_top is None:
@@ -611,7 +611,7 @@ if audio_source is not None:
             unsafe_allow_html=True,
         )
         if not birdnet_available:
-            st.info("`pip install birdnetlib` für den Vergleich.")
+            st.info("`uv sync --extra birdnet` für den Vergleich.")
         else:
             st.markdown(render_prob_bars(bn_probs), unsafe_allow_html=True)
             if birdnet_detections:
