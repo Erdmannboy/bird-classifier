@@ -16,7 +16,7 @@ vergleicht das eigene BirdCNN-Modell live mit dem bekannten System BirdNET.
 | Deep Learning | PyTorch |
 | Audio-Features | librosa, soundfile |
 | Daten-Split / Metriken | scikit-learn |
-| Daten-Bereinigung | TensorFlow Hub / YAMNet |
+| Daten-Bereinigung | librosa-Heuristik (Vogel-Score); YAMNet optional via `src/yamnet_worker.py` |
 | BirdNET-Vergleich | birdnetlib |
 | Web-App | Streamlit |
 | Daten-Download | requests (Xeno-Canto API) |
@@ -45,7 +45,7 @@ uv run python setup_check.py
 #    Vorher: API_KEY in src/bird_data.py eintragen
 uv run python src/bird_data.py
 
-# 2. Lange Aufnahmen in 5-s-WAV-Clips schneiden + YAMNet-Filterung
+# 2. Lange Aufnahmen in 5-s-WAV-Clips schneiden + librosa-Score-Filterung
 uv run python src/cut_audio.py
 
 # 3. Train / Val / Test-Splits als CSV erzeugen (data_splits/)

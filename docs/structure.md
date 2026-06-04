@@ -8,7 +8,8 @@ bird-classifier/
 ├── model_best.pth
 ├── model.pth
 ├── project.md
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 ├── setup_check.py
 ├── CLAUDE.md
 │
@@ -28,7 +29,8 @@ bird-classifier/
 └── src/
     ├── bird_data.py
     ├── cut_audio.py
-    └── build_dataset.py
+    ├── build_dataset.py
+    └── yamnet_worker.py
 ```
 
 > `data/` und `data_splits/` sind gitignored und enthalten lokal die Rohdaten
@@ -44,7 +46,7 @@ bird-classifier/
 
 | Pfad | Zweck |
 | --- | --- |
-| `app.py` | Streamlit-Web-App. Lädt `model_best.pth`, nimmt eine WAV-Datei entgegen (Upload oder Live-Aufnahme), zeigt Mel-Spektrogramm mit wählbarem 5-s-Ausschnitt, gibt CNN-Vorhersage und optionalen BirdNET-Vergleich aus. Einstiegspunkt: `streamlit run app.py`. |
+| `app.py` | Streamlit-Web-App. Lädt `model_best.pth`, nimmt eine WAV-Datei entgegen (Upload oder Live-Aufnahme), zeigt Mel-Spektrogramm mit wählbarem 5-s-Ausschnitt, gibt CNN-Vorhersage und optionalen BirdNET-Vergleich aus. Bei einer erkannten Zielart zusätzlich ein „Wissenswertes"-Panel (Steckbrief, Fun Facts, Plotly-Verbreitungskarte). Einstiegspunkt: `uv run streamlit run app.py`. |
 | `setup_check.py` | Einfacher Umgebungstest: gibt Python-Version und Versionsnummern der wichtigsten Bibliotheken aus. Kein Unittest-Framework, nur manueller Smoke-Test. |
 
 ### Modell-Artefakte
@@ -58,7 +60,8 @@ bird-classifier/
 
 | Pfad | Zweck |
 | --- | --- |
-| `requirements.txt` | Python-Abhängigkeiten ohne Versionspinning. Sektionen: Grundlagen, Visualisierung, Audio, ML, Streamlit, Xeno-Canto, YAMNet, BirdNET, Notebook, Export. |
+| `pyproject.toml` | Abhängigkeitsdefinition (uv). Sektionen: Grundlagen, Visualisierung, Audio, ML, Streamlit, Xeno-Canto, YAMNet, BirdNET, Notebook, Export. Installation via `uv sync`. |
+| `uv.lock` | Reproduzierbares Lockfile mit exakt gepinnten Versionen, von `uv sync` erzeugt. |
 | `CLAUDE.md` | Schnellreferenz für Claude-Code-Sessions: Befehle, Konventionen, Do's & Don'ts. |
 | `project.md` | Ausführliche ML4B-Projektdokumentation auf Deutsch: Idee, Business Understanding, Daten, Modell, Ergebnisse, Reflexion. |
 
@@ -69,8 +72,9 @@ Die drei Skripte müssen in dieser Reihenfolge ausgeführt werden:
 | Pfad | Schritt | Zweck |
 | --- | --- | --- |
 | `src/bird_data.py` | 1 | Lädt MP3-Aufnahmen von der Xeno-Canto API herunter. Konfigurierbar: Art (`SEARCH_BIRD`), Zielordner (`TARGET_CLASS`), maximale Dateianzahl (`MAX_FILES`), Mindestlänge in Sekunden. Speichert Dateien nach `data/<Klasse>/files/`. |
-| `src/cut_audio.py` | 2 | Schneidet lange MP3s in 5-Sekunden-WAV-Clips. Nutzt YAMNet (TensorFlow Hub) zur Klassifikation: Clips mit Vogel-Score ≥ 0,40 werden als „Hard Negative" markiert, Score ≥ 0,15 als normaler Hintergrund. Ausgabe: `data/<Klasse>/clips/`. |
-| `src/build_dataset.py` | 3 | Sammelt alle WAV-Clips, vergibt numerische Labels und erzeugt Train/Val/Test-Splits (70 / 15 / 15, Seed=42). Split erfolgt nach `recording_id`, nicht nach einzelnen Clips — verhindert Data Leakage. Ausgabe: `data_splits/train.csv`, `val.csv`, `test.csv`. |
+| `src/cut_audio.py` | 2 | Schneidet lange MP3s in 5-Sekunden-WAV-Clips (32 kHz). Berechnet pro Clip einen librosa-Vogel-Score (Energie > 1 kHz + Tonalität): Score ≥ 0,40 → „Hard Negative", Score ≥ 0,15 → normaler Hintergrund, darunter verworfen. Ausgabe: `data/<Klasse>/clips/`. (Ersetzt die frühere YAMNet-Filterung; siehe `yamnet_worker.py`.) |
+| `src/build_dataset.py` | 3 | Sammelt alle WAV-Clips, begrenzt pro Klasse via `TARGET_COUNTS` (Amsel/Kohlmeise/Rotkehlchen je 3000, Background 5000), vergibt numerische Labels und erzeugt Train/Val/Test-Splits (70 / 15 / 15, Seed=42). Split erfolgt nach `recording_id`, nicht nach einzelnen Clips — verhindert Data Leakage. Ausgabe: `data_splits/train.csv`, `val.csv`, `test.csv`. |
+| `src/yamnet_worker.py` | (optional) | Standalone-YAMNet-Scorer, der als isolierter Subprocess läuft (`python yamnet_worker.py <temp_dir>`) und je WAV einen Vogel-Score als JSON ausgibt. Aktuell **nicht** in die Pipeline eingebunden — Überbleibsel/Alternative zur librosa-Heuristik für höhere Filterqualität. |
 
 Jedes Skript enthält einen konfigurierbaren Block am Anfang (`# --- ANPASSEN ---`),
 in dem Art, Pfade und Schwellwerte angepasst werden.

@@ -85,7 +85,7 @@ Aus dem Audiosignal werden **Mel-Spektrogramme** berechnet:
 
 | Parameter | Wert |
 | --- | --- |
-| Sampling-Rate | 32.000 Hz (Zielklassen) / 16.000 Hz (Background-Schnitt) |
+| Sampling-Rate | 32.000 Hz (einheitlich für Clip-Schnitt und Training) |
 | Mel-Bänder | 128 |
 | fmax | 16.000 Hz |
 | Zeitfenster | feste Breite von 313 Frames (Padding / Crop) |
@@ -99,8 +99,9 @@ Inferenz: `app.py` (Funktion `array_to_mel_for_model`)
 
 - **Zielarten:** Klasse ergibt sich direkt aus dem Download (was als Amsel gesucht
   wird, erhält das Label Amsel).
-- **Background:** Kein manuelles Labeling. Das vortrainierte Google-Modell
-  **YAMNet** bewertet pro Clip den Vogel-Score (Skript: `src/cut_audio.py`).
+- **Background:** Kein manuelles Labeling. Eine librosa-Heuristik in
+  `src/cut_audio.py` bewertet pro Clip einen Vogel-Score (Energie > 1 kHz + Tonalität).
+  Früher übernahm das vortrainierte Google-Modell **YAMNet** (siehe Phase 4).
 
 ### Datensatzgröße (nach Vorverarbeitung)
 
@@ -118,8 +119,9 @@ Klassenverteilung im Trainingsset: ≈ 1.888 Amsel, 1.939 Kohlmeise,
 
 ### Identifizierte Risiken
 
-- Verrauschte Clips trotz Qualitätsstufe A → gelöst durch YAMNet-Filterung
-- Label-Rauschen durch selbst gesetzte YAMNet-Schwellen
+- Verrauschte Clips trotz Qualitätsstufe A → gelöst durch Score-basierte Filterung
+  (librosa-Heuristik, früher YAMNet)
+- Label-Rauschen durch selbst gesetzte Score-Schwellen
 - Generalisierungslücke: Daten aus relativ sauberen Einzelaufnahmen,
   keine Feldaufnahmen
 - Data Leakage (wenn Clips derselben Aufnahme in Train und Test landen)
@@ -132,7 +134,7 @@ Klassenverteilung im Trainingsset: ≈ 1.888 Amsel, 1.939 Kohlmeise,
 Dieses Projekt baut auf bestehenden Werkzeugen und Datensätzen zur audiobasierten Klassifikation von Vogelarten auf.
 
 * **Xeno-Canto** stellt öffentlich zugängliche Vogelstimmenaufnahmen bereit und dient als zentrale Datenquelle für dieses Projekt.
-* **YAMNet** wird als vortrainierter Audio-Event-Klassifikator genutzt, um Hintergrundaufnahmen zu filtern und Segmente mit vogelähnlichen Geräuschen zu erkennen.
+* **YAMNet** wurde ursprünglich als vortrainierter Audio-Event-Klassifikator genutzt, um Hintergrundaufnahmen zu filtern und Segmente mit vogelähnlichen Geräuschen zu erkennen. Aus Stabilitäts- und Sample-Rate-Gründen wurde diese Filterung durch eine librosa-Heuristik ersetzt; der YAMNet-Scorer liegt als isolierter Subprozess noch in `src/yamnet_worker.py` vor.
 * **BirdNET** wird in der Streamlit-Anwendung als externes Referenzsystem verwendet. BirdNET wird nicht zum Training unseres Modells genutzt, sondern dient dazu, die Vorhersagen unseres CNN-Modells mit einem etablierten System zur Vogelstimmenerkennung zu vergleichen.
 * **librosa** wird zum Laden der Audiodateien und zur Erzeugung der Mel-Spektrogramme verwendet.
 * **PyTorch** wird zur Implementierung und zum Training des eigenen CNN-Modells genutzt.
@@ -148,12 +150,15 @@ Der wichtigste Unterschied zu BirdNET besteht darin, dass unser Modell bewusst a
 
 **Skript:** `src/cut_audio.py`
 
-Lange MP3-Aufnahmen werden in **5-Sekunden-WAV-Segmente** zerschnitten.
+Lange MP3-Aufnahmen werden in **5-Sekunden-WAV-Segmente** (32 kHz) zerschnitten.
 Kurze Rest-Segmente am Ende werden verworfen.
 
-YAMNet (geladen via `tensorflow_hub`) klassifiziert jeden Clip:
+Eine **librosa-Heuristik** (`bird_score`) bewertet jeden Clip mit einem Vogel-Score
+in [0, 1], der zwei Merkmale kombiniert: den Energieanteil im Vogelfrequenzbereich
+(> 1 kHz) und die Tonalität (niedrige spektrale Flachheit = tonales, vogelähnliches
+Signal):
 
-| YAMNet Vogel-Score | Zuweisung | Dateiname-Suffix |
+| Vogel-Score | Zuweisung | Dateiname-Suffix |
 | --- | --- | --- |
 | ≥ 0,40 | Hard Negative (fremder Vogel klar hörbar) | `_hardneg.wav` |
 | ≥ 0,15 | Background (schwacher/diffuser Vogel) | `_bg.wav` |
@@ -161,7 +166,13 @@ YAMNet (geladen via `tensorflow_hub`) klassifiziert jeden Clip:
 
 Ausgabe: `data/<Klasse>/clips/`
 
-YAMNet bestimmt **nicht** die Vogelart, sondern dient nur der Qualitätskontrolle.
+Der Score bestimmt **nicht** die Vogelart, sondern dient nur der Qualitätskontrolle.
+
+> **Hinweis:** Diese Heuristik ersetzt die frühere YAMNet-basierte Filterung. YAMNet
+> (TensorFlow Hub) erwartet 16 kHz und ließ sich auf der Entwicklungsplattform nur stabil
+> in einem Subprozess betreiben; die Clips werden inzwischen einheitlich mit 32 kHz
+> (passend zum Training) erzeugt. Der YAMNet-Scorer ist als Standalone-Subprozess noch
+> unter `src/yamnet_worker.py` verfügbar, aber nicht in die Pipeline eingebunden.
 
 ### Schritt 2 — Feature-Berechnung
 
@@ -194,7 +205,9 @@ Implementiert als `SpecAugment`-Klasse in `notebooks/bird_training.ipynb`
 
 **Skript:** `src/build_dataset.py`
 
-- Alle WAV-Clips werden gesammelt, Labels vergeben (`LABEL_MAP`)
+- Alle WAV-Clips werden gesammelt, pro Klasse via `TARGET_COUNTS` begrenzt
+  (Amsel/Kohlmeise/Rotkehlchen je 3000, Background 5000; Überschuss wird zufällig
+  verworfen, Seed=42), Labels vergeben (`LABEL_MAP`)
 - Clips werden nach `recording_id` (erste Ziffernfolge im Dateinamen) gruppiert
 - Split der **Aufnahmen** (nicht der Clips): 70 % / 15 % / 15 %, Seed=42
 - So landen Clips derselben Originalaufnahme nie gleichzeitig in Train und Test
@@ -330,7 +343,7 @@ Metriken berechnet mit `sklearn.metrics` in `notebooks/bird_training.ipynb`.
 Die Anwendung ist eine **Streamlit-App** (`app.py`), die lokal gestartet wird.
 
 ```bash
-streamlit run app.py
+uv run streamlit run app.py
 ```
 
 Kein Docker-Image, kein Cloud-Deployment vorhanden.
@@ -344,14 +357,14 @@ Kein Docker-Image, kein Cloud-Deployment vorhanden.
 | Fenster-Auswahl | Slider zur Wahl des 5-s-Ausschnitts (bei Aufnahmen > 5 s) |
 | CNN-Vorhersage | Konfidenz-Wahrscheinlichkeiten für alle 4 Klassen; Background → „Kein Vogel" |
 | BirdNET-Vergleich | Optional via `birdnetlib`; läuft in separatem Subprocess |
-| Arten-Info | Karten mit Emoji, deutschem und wissenschaftlichem Name |
+| Wissenswertes | Bei erkannter Zielart: Steckbrief (wiss. Name, Lebenserwartung, Gewicht, Spannweite, Lebensraum, Ernährung, Brutzeit), Fun Facts und Plotly-Verbreitungskarte |
 
 ### Modell-Pfad
 
 Standardmäßig `model_best.pth` im Projektordner, überschreibbar via:
 
 ```bash
-BIRD_MODEL_PATH=/pfad/zu/modell.pth streamlit run app.py
+BIRD_MODEL_PATH=/pfad/zu/modell.pth uv run streamlit run app.py
 ```
 
 ### Konsistenz Training ↔ Inferenz
@@ -383,5 +396,5 @@ stdout zurückgegeben. Implementiert in `app.py` als `_BIRDNET_SUBPROCESS_SCRIPT
 
 ## 8. Future Work
 
-Mögliche Erweiterungen wären ein Docker-Image für eine reproduzierbare Laufzeitumgebung und ein Cloud-Deployment, zum Beispiel über Streamlit Cloud oder Hugging Face Spaces. Für die aktuelle Kursabgabe wird die Anwendung lokal über `streamlit run app.py` ausgeführt.
+Mögliche Erweiterungen wären ein Docker-Image für eine reproduzierbare Laufzeitumgebung und ein Cloud-Deployment, zum Beispiel über Streamlit Cloud oder Hugging Face Spaces. Für die aktuelle Kursabgabe wird die Anwendung lokal über `uv run streamlit run app.py` ausgeführt.
 
