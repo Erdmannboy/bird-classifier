@@ -8,15 +8,17 @@ CNN-Vorhersage dem bekannten System BirdNET direkt gegenüber.
 
 ---
 
-## Quickstar for Reviewers
+## Quickstart for Reviewers
 
 Dieses Repository enthält eine lauffähige Streamlit-Anwendung sowie ein bereits trainiertes PyTorch-Modell.
 
+```bash
 git clone https://github.com/sommedav/bird-classifier.git
 cd bird-classifier
 uv sync
 uv run python setup_check.py
 uv run streamlit run app.py
+```
 
 Nach dem Start der App kann eine WAV-Datei hochgeladen oder direkt im Browser eine Audioaufnahme erstellt werden. Die App wählt daraus ein 5-sekündiges Audiofenster aus, wandelt dieses in ein Mel-Spektrogramm um und sagt anschließend eine von vier Klassen vorher: Amsel, Kohlmeise, Rotkehlchen oder Background.
 
