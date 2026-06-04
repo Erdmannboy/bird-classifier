@@ -1,0 +1,40 @@
+[project]
+name = "bird-classifier"
+version = "0.1.0"
+description = "Vogelgesang-Klassifikator: Amsel, Kohlmeise, Rotkehlchen, Background"
+requires-python = ">=3.9"
+dependencies = [
+    # Grundlagen
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    # Visualisierung
+    "matplotlib",
+    "plotly",
+    # Audio
+    "librosa",
+    "soundfile",
+    # Machine Learning
+    "torch",
+    # Streamlit App
+    "streamlit",
+    # Xeno-Canto Download
+    "requests",
+    # YAMNet (Background-Erzeugung)
+    "tensorflow",
+    "tensorflow-hub",
+    # Notebook Support
+    "jupyterlab",
+    "notebook",
+    "ipykernel",
+    # CSV / Excel Export
+    "openpyxl",
+]
+
+[project.optional-dependencies]
+birdnet = [
+    "birdnetlib",
+]
+
+[tool.uv]
+package = false
