@@ -14,9 +14,9 @@ Dieses Repository enthält eine lauffähige Streamlit-Anwendung sowie ein bereit
 
 git clone https://github.com/sommedav/bird-classifier.git
 cd bird-classifier
-pip install -r requirements.txt
-python setup_check.py
-streamlit run app.py
+uv sync
+uv run python setup_check.py
+uv run streamlit run app.py
 
 Nach dem Start der App kann eine WAV-Datei hochgeladen oder direkt im Browser eine Audioaufnahme erstellt werden. Die App wählt daraus ein 5-sekündiges Audiofenster aus, wandelt dieses in ein Mel-Spektrogramm um und sagt anschließend eine von vier Klassen vorher: Amsel, Kohlmeise, Rotkehlchen oder Background.
 
@@ -55,9 +55,10 @@ Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des
 ## Voraussetzungen (Prerequisites)
 
 - Python 3.9 oder neuer
+- [uv](https://docs.astral.sh/uv/) (Paketmanager) — `brew install uv` oder `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - `model_best.pth` im Projektordner (enthalten im Repository oder selbst trainiert)
 - Für den Xeno-Canto-Download: kostenloser API-Key von [xeno-canto.org](https://xeno-canto.org)
-- Für BirdNET-Vergleich: `pip install birdnetlib` (optional)
+- Für BirdNET-Vergleich: optional via `uv sync --extra birdnet`
 
 ---
 
@@ -68,11 +69,14 @@ Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des
 git clone https://github.com/sommedav/bird-classifier.git
 cd bird-classifier
 
-# 2. Abhängigkeiten installieren
-pip install -r requirements.txt
+# 2. Abhängigkeiten installieren (erzeugt .venv automatisch)
+uv sync
+
+# Optional: BirdNET-Vergleich einschließen
+uv sync --extra birdnet
 
 # 3. Umgebung prüfen
-python setup_check.py
+uv run python setup_check.py
 ```
 
 ---
@@ -84,7 +88,7 @@ python setup_check.py
 `model_best.pth` liegt bereits im Repo — die App ist sofort nutzbar:
 
 ```bash
-streamlit run app.py
+uv run streamlit run app.py
 ```
 
 Der Browser öffnet sich automatisch. Du kannst eine WAV-Datei hochladen oder
@@ -94,7 +98,7 @@ die App zeigt Mel-Spektrogramm, CNN-Vorhersage und (optional) BirdNET-Vergleich.
 Alternativer Modell-Pfad via Umgebungsvariable:
 
 ```bash
-BIRD_MODEL_PATH=/pfad/zu/modell.pth streamlit run app.py
+BIRD_MODEL_PATH=/pfad/zu/modell.pth uv run streamlit run app.py
 ```
 
 ### Modell selbst trainieren
@@ -103,16 +107,16 @@ Führe die folgenden Schritte der Reihe nach aus:
 
 ```bash
 # Schritt 1 — Rohdaten herunterladen (API-Key in src/bird_data.py eintragen)
-python src/bird_data.py
+uv run python src/bird_data.py
 
 # Schritt 2 — Aufnahmen in 5-s-WAV-Clips schneiden + YAMNet-Filterung
-python src/cut_audio.py
+uv run python src/cut_audio.py
 
 # Schritt 3 — Train/Val/Test-Splits erzeugen
-python src/build_dataset.py
+uv run python src/build_dataset.py
 
 # Schritt 4 — Notebook öffnen und alle Zellen ausführen
-jupyter lab notebooks/bird_training.ipynb
+uv run jupyter lab notebooks/bird_training.ipynb
 ```
 
 Das Training speichert `model_best.pth` (bester Val-Checkpoint) und `model.pth`
@@ -134,7 +138,8 @@ bird-classifier/
 ├── docs/                   # Projektdokumentation
 ├── app.py                  # Streamlit-App
 ├── model_best.pth          # Bestes Modell-Checkpoint
-├── requirements.txt
+├── pyproject.toml          # Abhängigkeitsdefinition (UV)
+├── uv.lock                 # Reproduzierbares Lockfile
 └── ...
 ```
 
@@ -192,7 +197,7 @@ Automatisierte Unit-Tests sind in diesem Projekt nicht enthalten. Zur Überprüf
 Umgebungscheck:
 
 ```bash
-python setup_check.py
+uv run python setup_check.py
 ```
 
 ---
