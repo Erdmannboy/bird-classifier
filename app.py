@@ -14,6 +14,7 @@ import numpy as np
 import soundfile as sf
 import streamlit as st
 import torch
+import plotly.graph_objects as go
 import torch.nn as nn
 
 # ======================================
@@ -30,6 +31,73 @@ CLASS_INFO = {
     "Kohlmeise":   {"emoji": "🐤",   "color": "#F39C12", "scientific": "Parus major"},
     "Rotkehlchen": {"emoji": "🐦",   "color": "#E74C3C", "scientific": "Erithacus rubecula"},
     NO_BIRD_LABEL: {"emoji": "🤷",   "color": "#95A5A6", "scientific": "Keiner der drei Vögel"},
+}
+
+BIRD_FACTS = {
+    "Amsel": {
+        "lifespan": "2–3 Jahre (Rekord: ca. 18 Jahre)",
+        "weight": "80–125 g",
+        "wingspan": "34–38 cm",
+        "habitat": "Wälder, Parks, Gärten, Gebüsche",
+        "diet": "Würmer, Insekten, Beeren, Früchte",
+        "nesting": "März–Juli · 2–3 Bruten · 4–5 Eier",
+        "distribution_text": "Heimisch in Europa, Nordafrika und Teilen Asiens; eingeführt in Australien und Neuseeland.",
+        "distribution_countries": [
+            "DEU","AUT","CHE","FRA","GBR","IRL","ITA","ESP","PRT","NLD","BEL","LUX",
+            "DNK","SWE","NOR","FIN","POL","CZE","SVK","HUN","ROU","BGR","GRC","HRV",
+            "SVN","SRB","BIH","MKD","ALB","MNE","TUR","GEO","ARM","AZE","UKR","BLR",
+            "MDA","LTU","LVA","EST","ISL","CYP","MLT","DZA","MAR","TUN","LBY","EGY",
+            "IRN","IRQ","SYR","LBN","ISR","JOR","AFG","PAK","IND","NPL","CHN","AUS","NZL",
+        ],
+        "fun_facts": [
+            "Männchen sind tiefschwarz mit leuchtend gelbem Schnabel – Weibchen und Jungtiere hingegen braun.",
+            "Ursprünglich ein scheuer Waldvogel, erst seit dem 19. Jh. typischer Stadt- und Gartenbewohner.",
+            "Ihr Gesang gilt als einer der melodischsten Europas – am lautesten in der Morgen- und Abenddämmerung.",
+        ],
+    },
+    "Kohlmeise": {
+        "lifespan": "2–3 Jahre (Rekord: ~13 Jahre)",
+        "weight": "14–22 g",
+        "wingspan": "22–25 cm",
+        "habitat": "Laub- und Mischwälder, Parks, Gärten",
+        "diet": "Insekten, Samen, Nüsse, Beeren",
+        "nesting": "April–Juni · 1–2 Bruten · 6–12 Eier",
+        "distribution_text": "Von Westeuropa bis Japan, von Skandinavien bis Nordafrika und Südostasien.",
+        "distribution_countries": [
+            "DEU","AUT","CHE","FRA","GBR","IRL","ITA","ESP","PRT","NLD","BEL","LUX",
+            "DNK","SWE","NOR","FIN","POL","CZE","SVK","HUN","ROU","BGR","GRC","HRV",
+            "SVN","SRB","BIH","MKD","ALB","MNE","TUR","GEO","ARM","AZE","UKR","BLR",
+            "RUS","KAZ","UZB","TKM","IRN","AFG","PAK","IND","NPL","CHN","JPN","KOR",
+            "PRK","MNG","VNM","THA","MYS","IDN","DZA","MAR","TUN","EGY","ISR","LBN",
+            "JOR","LTU","LVA","EST","ISL","CYP","MLT","MDA",
+        ],
+        "fun_facts": [
+            "Eine der häufigsten Vogelarten Europas – an fast jedem Gartenvogelhäuschen anzutreffen.",
+            "Bekannt für das Öffnen von Milchflaschen-Aludeckeln – eine Fähigkeit, die sich unter Artgenossen verbreitete.",
+            "Kann bis zu 12 Eier pro Gelege legen – für einen so kleinen Vogel eine außergewöhnlich große Anzahl.",
+        ],
+    },
+    "Rotkehlchen": {
+        "lifespan": "1–3 Jahre (Rekord: ~11 Jahre)",
+        "weight": "14–21 g",
+        "wingspan": "20–22 cm",
+        "habitat": "Wälder, Hecken, Parks, Gärten – bevorzugt feuchte Lagen",
+        "diet": "Insekten, Würmer, Beeren, Samen",
+        "nesting": "März–August · 2 Bruten · 4–6 Eier",
+        "distribution_text": "Europa, Westasien und Nordafrika; viele Populationen ziehen im Winter in den Süden.",
+        "distribution_countries": [
+            "DEU","AUT","CHE","FRA","GBR","IRL","ITA","ESP","PRT","NLD","BEL","LUX",
+            "DNK","SWE","NOR","FIN","POL","CZE","SVK","HUN","ROU","BGR","GRC","HRV",
+            "SVN","SRB","BIH","MKD","ALB","MNE","TUR","GEO","ARM","AZE","UKR","BLR",
+            "MDA","LTU","LVA","EST","ISL","CYP","MLT","DZA","MAR","TUN","LBY","EGY",
+            "IRN","SYR","LBN","ISR","JOR","RUS","KAZ",
+        ],
+        "fun_facts": [
+            "In Großbritannien gilt es als inoffizieller Nationalvogel und ist das beliebteste Gartenvogel-Symbol.",
+            "Trotz seiner geringen Größe sehr territorial – verteidigt sein Revier auch im Winter aggressiv.",
+            "Folgt oft Gärtnern und wühlenden Tieren – wartet geduldig auf freigelegte Würmer und Insekten.",
+        ],
+    },
 }
 
 # BirdNET → unsere lokalen Namen (per scientific name)
@@ -262,6 +330,140 @@ def birdnet_top_detection(detections):
     return (common, sci, conf, False)
 
 # ======================================
+# BIRD FACTS RENDERER
+# ======================================
+
+def _is_dark_theme() -> bool:
+    """True, wenn der Browser/das aktive Streamlit-Theme auf Dunkel steht.
+
+    CSS-Variablen regeln das HTML automatisch per prefers-color-scheme; Plotly
+    kennt diese Variablen aber nicht, daher hier die serverseitige Erkennung.
+    """
+    try:
+        return st.context.theme.type == "dark"
+    except Exception:
+        return False
+
+
+def render_bird_facts(bird_name: str):
+    if bird_name not in BIRD_FACTS:
+        return
+
+    facts = BIRD_FACTS[bird_name]
+    info = CLASS_INFO[bird_name]
+    color = info["color"]
+
+    st.markdown(
+        f'<div class="section-title">📚 Wissenswertes: {info["emoji"]} {bird_name}</div>',
+        unsafe_allow_html=True,
+    )
+
+    col_facts, col_map = st.columns([1, 1], gap="large")
+
+    with col_facts:
+        fun_facts_html = "".join(
+            f'<div style="padding:6px 0; border-bottom:1px solid var(--divider-soft); font-size:0.88rem; color:var(--text-body);">'
+            f'💡 {f}</div>'
+            for f in facts["fun_facts"]
+        )
+        st.markdown(f"""
+        <div class="card">
+            <div style="font-size:0.72rem; font-weight:700; letter-spacing:1.5px;
+                        text-transform:uppercase; color:{color}; margin-bottom:0.9rem;">
+                Steckbrief
+            </div>
+            <table style="width:100%; border-collapse:collapse;">
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem; white-space:nowrap;">🔬 Wiss. Name</td>
+                    <td style="padding:5px 0; font-weight:600; font-style:italic; font-size:0.85rem;">{info['scientific']}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem;">⏳ Lebenserwartung</td>
+                    <td style="padding:5px 0; font-weight:600; font-size:0.85rem;">{facts['lifespan']}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem;">⚖️ Gewicht</td>
+                    <td style="padding:5px 0; font-weight:600; font-size:0.85rem;">{facts['weight']}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem;">🦅 Spannweite</td>
+                    <td style="padding:5px 0; font-weight:600; font-size:0.85rem;">{facts['wingspan']}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem;">🌿 Lebensraum</td>
+                    <td style="padding:5px 0; font-weight:600; font-size:0.85rem;">{facts['habitat']}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem;">🍎 Ernährung</td>
+                    <td style="padding:5px 0; font-weight:600; font-size:0.85rem;">{facts['diet']}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px 5px 0; color:var(--text-muted); font-size:0.85rem;">🥚 Brutzeit & Gelege</td>
+                    <td style="padding:5px 0; font-weight:600; font-size:0.85rem;">{facts['nesting']}</td>
+                </tr>
+            </table>
+            <div style="margin-top:1.1rem; font-size:0.72rem; font-weight:700; letter-spacing:1.5px;
+                        text-transform:uppercase; color:{color}; margin-bottom:0.5rem;">
+                Interessantes
+            </div>
+            {fun_facts_html}
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_map:
+        n = len(facts["distribution_countries"])
+        dark = _is_dark_theme()
+
+        # Amsel-Akzent (#2C3E50) ist auf dunklem Grund praktisch unsichtbar —
+        # im Dunkelmodus daher zu einem helleren Slate-Blau wechseln.
+        fill_color = "#5b7da6" if (dark and color.upper() == "#2C3E50") else color
+        title_color = "#e9eef5" if dark else "#2c3e50"
+        land_color = "#2a2f3a" if dark else "#f0f0f0"
+        ocean_color = "rgba(70,100,135,0.30)" if dark else "rgba(173,216,230,0.4)"
+        coast_color = "#3a4150" if dark else "#cccccc"
+        country_color = "#333a47" if dark else "#dddddd"
+        line_color = "#1a1f29" if dark else "white"
+
+        fig = go.Figure(go.Choropleth(
+            locations=facts["distribution_countries"],
+            z=[1] * n,
+            colorscale=[[0, fill_color], [1, fill_color]],
+            showscale=False,
+            marker_line_color=line_color,
+            marker_line_width=0.5,
+            zmin=0,
+            zmax=1,
+        ))
+        fig.update_layout(
+            title=dict(
+                text=f"Verbreitung der {bird_name}",
+                x=0.5,
+                xref="paper",
+                xanchor="center",
+                font=dict(size=14, color=title_color),
+            ),
+            margin=dict(l=0, r=0, t=40, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            height=310,
+            geo=dict(
+                showframe=False,
+                showcoastlines=True,
+                coastlinecolor=coast_color,
+                showcountries=True,
+                countrycolor=country_color,
+                bgcolor="rgba(0,0,0,0)",
+                showland=True,
+                landcolor=land_color,
+                showocean=True,
+                oceancolor=ocean_color,
+                projection_type="natural earth",
+            ),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(f"🌍 {facts['distribution_text']}")
+
+
+# ======================================
 # PAGE CONFIG + CSS
 # ======================================
 
@@ -274,6 +476,45 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /* ===== THEME-VARIABLEN — folgen automatisch der Hell-/Dunkel- =====
+       ===== Einstellung des Browsers via prefers-color-scheme.      ===== */
+    :root {
+        --card-bg: #ffffff;
+        --card-border: #eef0f3;
+        --text-strong: #2c3e50;
+        --text-body: #34495e;
+        --text-muted: #7f8c8d;
+        --text-faint: #95a5a6;
+        --divider: #ecf0f1;
+        --divider-soft: #f5f5f5;
+        --result-bg: linear-gradient(135deg, #f6f9fc 0%, #eef2f7 100%);
+        --result-border: #e6ebf1;
+        --bar-bg: #ecf0f1;
+        --accent-mine: #4754c1;
+        --accent-birdnet: #16a085;
+        --tag-mine-bg: #eef0fb;
+        --tag-birdnet-bg: #e8f7f2;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --card-bg: #1a1f29;
+            --card-border: #2b323e;
+            --text-strong: #e9eef5;
+            --text-body: #c7d0db;
+            --text-muted: #94a1b0;
+            --text-faint: #8794a3;
+            --divider: #2b323e;
+            --divider-soft: #262c36;
+            --result-bg: linear-gradient(135deg, #1c2230 0%, #181d27 100%);
+            --result-border: #2b323e;
+            --bar-bg: #2b323e;
+            --accent-mine: #aab4ff;
+            --accent-birdnet: #4fd1b0;
+            --tag-mine-bg: #232a47;
+            --tag-birdnet-bg: #15352d;
+        }
+    }
+
     #MainMenu, footer, header {visibility: hidden;}
     .main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }
 
@@ -287,39 +528,39 @@ st.markdown("""
     .hero p  { font-size: 1.1rem; opacity: 0.95; margin: 0.5rem 0 0 0; }
 
     .card {
-        background: white; padding: 1.5rem; border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #eef0f3;
-        margin-bottom: 1rem;
+        background: var(--card-bg); padding: 1.5rem; border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid var(--card-border);
+        color: var(--text-body); margin-bottom: 1rem;
     }
 
     .result-box {
-        background: linear-gradient(135deg, #f6f9fc 0%, #eef2f7 100%);
+        background: var(--result-bg);
         padding: 1.6rem 1.2rem; border-radius: 16px;
-        text-align: center; border: 2px solid #e6ebf1;
+        text-align: center; border: 2px solid var(--result-border);
         margin-bottom: 1rem;
     }
     .result-tag        { font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px;
-                         text-transform: uppercase; color: #95a5a6; margin-bottom: 0.4rem; }
+                         text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.4rem; }
     .result-emoji      { font-size: 3.2rem; line-height: 1; margin-bottom: 0.3rem; }
-    .result-name       { font-size: 1.6rem; font-weight: 700; color: #2c3e50; margin: 0; }
-    .result-scientific { font-style: italic; color: #7f8c8d; margin: 0.2rem 0 0.8rem 0; font-size: 0.9rem; }
-    .result-conf-label { font-size: 0.75rem; color: #95a5a6; text-transform: uppercase; letter-spacing: 1px; }
+    .result-name       { font-size: 1.6rem; font-weight: 700; color: var(--text-strong); margin: 0; }
+    .result-scientific { font-style: italic; color: var(--text-muted); margin: 0.2rem 0 0.8rem 0; font-size: 0.9rem; }
+    .result-conf-label { font-size: 0.75rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1px; }
     .result-conf-val   { font-size: 1.5rem; font-weight: 700; color: #27ae60; }
 
-    .result-tag.mine    { color: #667eea; }
-    .result-tag.birdnet { color: #16a085; }
+    .result-tag.mine    { color: var(--accent-mine); }
+    .result-tag.birdnet { color: var(--accent-birdnet); }
 
     .prob-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-    .prob-label   { flex: 0 0 145px; font-weight: 600; color: #34495e; font-size: 0.95rem; }
-    .prob-bar-bg  { flex: 1; background: #ecf0f1; height: 20px; border-radius: 10px; overflow: hidden; }
+    .prob-label   { flex: 0 0 145px; font-weight: 600; color: var(--text-body); font-size: 0.95rem; }
+    .prob-bar-bg  { flex: 1; background: var(--bar-bg); height: 20px; border-radius: 10px; overflow: hidden; }
     .prob-bar-fill{ height: 100%; border-radius: 10px; transition: width 0.4s ease; }
     .prob-value   { flex: 0 0 60px; text-align: right; font-weight: 700;
-                    font-variant-numeric: tabular-nums; color: #2c3e50; }
+                    font-variant-numeric: tabular-nums; color: var(--text-strong); }
 
     .section-title {
-        font-size: 1.1rem; font-weight: 700; color: #2c3e50;
+        font-size: 1.1rem; font-weight: 700; color: var(--text-strong);
         margin: 1.5rem 0 0.8rem 0; padding-bottom: 0.4rem;
-        border-bottom: 2px solid #ecf0f1;
+        border-bottom: 2px solid var(--divider);
     }
 
     .compare-col-title {
@@ -327,8 +568,8 @@ st.markdown("""
         padding: 0.5rem 0.8rem; border-radius: 8px;
         margin-bottom: 0.6rem; text-align: center;
     }
-    .compare-col-title.mine    { background: #eef0fb; color: #4754c1; }
-    .compare-col-title.birdnet { background: #e8f7f2; color: #16a085; }
+    .compare-col-title.mine    { background: var(--tag-mine-bg); color: var(--accent-mine); }
+    .compare-col-title.birdnet { background: var(--tag-birdnet-bg); color: var(--accent-birdnet); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -404,8 +645,8 @@ if audio_source is None:
             st.markdown(f"""
             <div class="card" style="text-align:center;">
                 <div style="font-size:3.5rem; line-height:1;">{info['emoji']}</div>
-                <div style="font-weight:700; font-size:1.2rem; color:#2c3e50; margin-top:0.5rem;">{name}</div>
-                <div style="font-style:italic; color:#7f8c8d; font-size:0.9rem;">{info['scientific']}</div>
+                <div style="font-weight:700; font-size:1.2rem; color:var(--text-strong); margin-top:0.5rem;">{name}</div>
+                <div style="font-style:italic; color:var(--text-muted); font-size:0.9rem;">{info['scientific']}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -551,7 +792,7 @@ if audio_source is not None:
                 <div class="result-name">{NO_BIRD_LABEL}</div>
                 <div class="result-scientific">{CLASS_INFO[NO_BIRD_LABEL]['scientific']}</div>
                 <div class="result-conf-label">Keine Detektion</div>
-                <div class="result-conf-val" style="color:#95a5a6;">—</div>
+                <div class="result-conf-val" style="color:var(--text-faint);">—</div>
             </div>
             """, unsafe_allow_html=True)
         else:
@@ -624,3 +865,7 @@ if audio_source is not None:
                             f"{d.get('confidence',0)*100:.1f}% "
                             f"@ {d.get('start_time',0):.1f}–{d.get('end_time',0):.1f}s"
                         )
+
+    # ---- Vogel-Fakten (nur wenn eine der drei Arten erkannt wurde) ----
+    if my_top_label in BIRD_CLASSES:
+        render_bird_facts(my_top_label)
