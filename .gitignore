@@ -6,8 +6,11 @@ __pycache__/
 dist/
 build/
 
-# Projektdaten (zu groß für Git)
-data/*/
+# Projektdaten (zu groß für Git) – Ordnerstruktur mit .gitkeep bleibt erhalten
+data/**/*.mp3
+data/**/*.MP3
+data/**/*.wav
+data/**/*.WAV
 data_splits/*.csv
 
 # Jupyter
