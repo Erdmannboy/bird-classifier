@@ -17,7 +17,7 @@ vergleicht das eigene BirdCNN-Modell live mit dem bekannten System BirdNET.
 | Audio-Features | librosa, soundfile |
 | Daten-Split / Metriken | scikit-learn |
 | Daten-Bereinigung | TensorFlow Hub / YAMNet |
-| BirdNET-Vergleich | birdnetlib (optional) |
+| BirdNET-Vergleich | birdnetlib |
 | Web-App | Streamlit |
 | Daten-Download | requests (Xeno-Canto API) |
 | Notebooks | JupyterLab / notebook / ipykernel |
@@ -31,10 +31,8 @@ vergleicht das eigene BirdCNN-Modell live mit dem bekannten System BirdNET.
 
 ```bash
 # Abhängigkeiten installieren (erzeugt .venv + uv.lock)
+# Enthält auch birdnetlib für den BirdNET-Vergleich.
 uv sync
-
-# Optional: BirdNET-Vergleich einschließen
-uv sync --extra birdnet
 
 # Umgebung testen
 uv run python setup_check.py
