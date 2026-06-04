@@ -32,7 +32,7 @@ Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des
 - Erkennung von „kein Vogel" durch explizite Background-Klasse
 - Interaktive Streamlit-App: WAV-Datei hochladen oder live aufnehmen
 - Mel-Spektrogramm-Visualisierung mit wählbarem Analysefenster
-- Direktvergleich mit BirdNET (optional, via `birdnetlib`)
+- Direktvergleich mit BirdNET (via `birdnetlib`)
 - Reproduzierbare Datenpipeline: Download → Zuschneiden → Split → Training
 - Aufnahme-basierter Train/Val/Test-Split verhindert Data Leakage
 
@@ -47,7 +47,7 @@ Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des
 | Daten-Bereinigung | TensorFlow Hub, YAMNet |
 | Daten-Split / Metriken | scikit-learn |
 | Web-App | Streamlit |
-| BirdNET-Vergleich | birdnetlib (optional) |
+| BirdNET-Vergleich | birdnetlib |
 | Daten-Download | requests (Xeno-Canto API) |
 | Visualisierung | matplotlib, plotly |
 | Notebooks | JupyterLab |
@@ -60,7 +60,7 @@ Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des
 - [uv](https://docs.astral.sh/uv/) (Paketmanager) — `brew install uv` oder `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - `model_best.pth` im Projektordner (enthalten im Repository oder selbst trainiert)
 - Für den Xeno-Canto-Download: kostenloser API-Key von [xeno-canto.org](https://xeno-canto.org)
-- Für BirdNET-Vergleich: optional via `uv sync --extra birdnet`
+- BirdNET-Vergleich (`birdnetlib`) ist standardmäßig in `uv sync` enthalten
 
 ---
 
@@ -72,10 +72,8 @@ git clone https://github.com/sommedav/bird-classifier.git
 cd bird-classifier
 
 # 2. Abhängigkeiten installieren (erzeugt .venv automatisch)
+#    Enthält auch birdnetlib für den BirdNET-Vergleich.
 uv sync
-
-# Optional: BirdNET-Vergleich einschließen
-uv sync --extra birdnet
 
 # 3. Umgebung prüfen
 uv run python setup_check.py

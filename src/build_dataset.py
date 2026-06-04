@@ -12,9 +12,11 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 # --- ANPASSEN ----------------------------------------------------------------
-# Ordner mit den Clips und Zielordner fuer die CSV-Splits (relativ zum Projekt)
-BASE_DIR = Path("data")
-OUTPUT_DIR = Path("data_splits")
+# Ordner mit den Clips und Zielordner fuer die CSV-Splits.
+# Immer relativ zum Projektordner (egal von wo aufgerufen).
+PROJECT_ROOT = Path(__file__).parent.parent
+BASE_DIR = PROJECT_ROOT / "data"
+OUTPUT_DIR = PROJECT_ROOT / "data_splits"
 
 # Wie viele Clips pro Klasse maximal verwenden? (Rest wird zufaellig verworfen)
 TARGET_COUNTS = {
@@ -36,6 +38,9 @@ LABEL_MAP = {
 TEST_AND_VAL_SHARE = 0.30   # davon je zur Haelfte Val und Test -> 70/15/15
 RANDOM_STATE = 42
 # -----------------------------------------------------------------------------
+
+# Seed setzen, damit auch das Subsampling (random.sample) reproduzierbar ist.
+random.seed(RANDOM_STATE)
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -64,7 +69,7 @@ for class_name in TARGET_COUNTS:
     for file in files:
         recording_id = extract_recording_id(file)
         all_samples.append({
-            "path": str(clips_dir / file),
+            "path": str((clips_dir / file).resolve()),
             "label": LABEL_MAP[class_name],
             "class_name": class_name,
             "recording_id": f"{class_name}_{recording_id}",
