@@ -11,11 +11,11 @@ import librosa
 import soundfile as sf
 
 # --- ANPASSEN , je nach Vogel--------------------------------------------------
-BIRD_NAME = "Amsel"
+BIRD_NAME = "Kohlmeise"
 
 BASE_DIR = Path("data")
-INPUT_DIR  = BASE_DIR / "Amsel"      / "files"
-OUTPUT_DIR = BASE_DIR / "Amsel"      / "clips"   # Hard Negatives (klar hoerbarer Vogel)
+INPUT_DIR  = BASE_DIR / "Kohlmeise"      / "files"
+OUTPUT_DIR = BASE_DIR / "Kohlmeise"      / "clips"   # Hard Negatives (klar hoerbarer Vogel)
 
 # so lassen: 
 OUTPUT_BG  = BASE_DIR / "Background" / "clips"   # Background-Clips (schwacher Vogelanteil)

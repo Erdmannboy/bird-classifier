@@ -16,10 +16,10 @@ import requests
 API_KEY = "f4eb2feb67656eda01ca89ef084aa49c0e7d3ee7"
 
 # Welche Art soll geladen werden? (einer der Schlüssel aus BIRD_CONFIG unten)
-SEARCH_BIRD = "Amsel"
+SEARCH_BIRD = "Kohlmeise"
 
 # In welchen Klassen-Ordner kommen die Dateien? (z.B. "Amsel" oder "Background")
-TARGET_CLASS = "Amsel"
+TARGET_CLASS = "Kohlmeise"
 
 # Basisordner für die Rohdaten (relativ zum Projekt)
 BASE_DIR = Path("data")
