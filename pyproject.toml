@@ -20,20 +20,20 @@ dependencies = [
     "streamlit",
     # Xeno-Canto Download
     "requests",
+    "tqdm",
     # YAMNet (Background-Erzeugung)
     "tensorflow",
     "tensorflow-hub",
+    # BirdNET-Vergleich (Subprocess in app.py)
+    "birdnetlib",
+    # resampy: von birdnetlib benötigt (librosa.load mit res_type="kaiser_fast")
+    "resampy",
     # Notebook Support
     "jupyterlab",
     "notebook",
     "ipykernel",
     # CSV / Excel Export
     "openpyxl",
-]
-
-[project.optional-dependencies]
-birdnet = [
-    "birdnetlib",
 ]
 
 [tool.uv]
