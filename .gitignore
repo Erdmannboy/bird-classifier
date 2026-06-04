@@ -1,0 +1,21 @@
+# UV / Python-Umgebung
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Projektdaten (zu groß für Git)
+data/*/
+data_splits/*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
