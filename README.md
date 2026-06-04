@@ -110,6 +110,8 @@ Führe die folgenden Schritte der Reihe nach aus:
 ```bash
 # Schritt 1 — Rohdaten herunterladen (API-Key in src/bird_data.py eintragen)
 uv run python src/bird_data.py
+#-> Für Amsel, Rotkehlchen und Kohlmeise die Daten ziehen! Jeweils den Zielordner auf die ensprechende Vogelart einstellen
+#Achtung! Krähe, Taube und Spatz sind nur für Hintergrunddaten, hier den Zielordner TARGET_CLASS auf Background anpassen; Sonst kann die Vogelart immer auf search Bird gestellt werden
 
 # Schritt 2 — Aufnahmen in 5-s-WAV-Clips schneiden + YAMNet-Filterung
 uv run python src/cut_audio.py
