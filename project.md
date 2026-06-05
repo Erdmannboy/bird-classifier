@@ -238,6 +238,11 @@ zunächst Konflikte beschert, die wir über einen Subprozess gelöst haben. Und 
 wir den ML-Teil stark mit KI erarbeitet haben, haben wir gerade an den Daten- und
 Problemstellen viel darüber gelernt, worauf es bei so einem Projekt wirklich ankommt.
 
+Im Verlauf des Projekts wurde zunächst ein erstes Repository angelegt, das im Laufe der
+Entwicklung zunehmend unübersichtlich wurde. Aus diesem Grund wurde das Projekt in einem
+neuen, sauber strukturierten Repository neu aufgesetzt. Das alte Repository ist hier
+einsehbar: [LINK]
+
 ## 10. Zukunftsperspektive
 
 Ein erster wichtiger Schritt wäre die Erweiterung der Artenzahl. Aktuell erkennt das
