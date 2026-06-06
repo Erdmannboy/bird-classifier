@@ -10,15 +10,19 @@ CNN-Vorhersage dem bekannten System BirdNET direkt gegenüber.
 
 ## Quickstart for Reviewers
 
-Dieses Repository enthält eine lauffähige Streamlit-Anwendung sowie ein bereits trainiertes PyTorch-Modell.
+Dieses Repository enthält eine lauffähige Streamlit-App und ein bereits trainiertes Modell (`model_best.pth`). Die Trainingsdaten sind nicht enthalten, die App kann aber direkt gestartet werden.
+
+Für die Installation siehe Abschnitt "Voraussetzungen" und "Installation".
 
 ```bash
 git clone https://github.com/sommedav/bird-classifier.git
 cd bird-classifier
-uv sync
+uv python install 3.11
+uv sync --locked
 uv run python setup_check.py
 uv run streamlit run app.py
 ```
+Wichtig: Der Quickstart soll kompakt bleiben. Die ausführlichen Windows/macOS-Befehle kommen darunter bei **Voraussetzungen** und **Installation**!
 
 Nach dem Start der App kann eine WAV-Datei hochgeladen oder direkt im Browser eine Audioaufnahme erstellt werden. Die App wählt daraus ein 5-sekündiges Audiofenster aus, wandelt dieses in ein Mel-Spektrogramm um und sagt anschließend eine von vier Klassen vorher: Amsel, Kohlmeise, Rotkehlchen oder Background.
 
@@ -56,11 +60,57 @@ Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des
 
 ## Voraussetzungen (Prerequisites)
 
-- Python 3.9 oder neuer
-- [uv](https://docs.astral.sh/uv/) (Paketmanager) — `brew install uv` oder `curl -LsSf https://astral.sh/uv/install.sh | sh`
+Für die Nutzung der Anwendung wird keine manuelle Installation einzelner Python-Pakete benötigt. Das Projekt verwendet `uv` als Paketmanager. `uv` erstellt die virtuelle Umgebung automatisch und installiert die im Projekt festgelegten Abhängigkeiten aus `pyproject.toml` und `uv.lock`.
+
+### Benötigte Software
+
+- Python 3.11 oder neuer. Empfohlen ist Python 3.11, da die Projektumgebung über `.python-version` auf 3.11 festgelegt ist.
+- [uv](https://docs.astral.sh/uv/) (Python-Paketmanager) — `brew install uv` oder `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - `model_best.pth` im Projektordner (enthalten im Repository oder selbst trainiert)
-- Für den Xeno-Canto-Download: kostenloser API-Key von [xeno-canto.org](https://xeno-canto.org)
+- Für die reine Nutzung der App wird kein Xeno-Canto-API-Key benötigt
+- Für den Xeno-Canto-Download: kostenloser API-Key von [xeno-canto.org](https://xeno-canto.org) 
 - BirdNET-Vergleich (`birdnetlib`) ist standardmäßig in `uv sync` enthalten
+
+### uv installieren
+
+`uv` ist der Paketmanager, mit dem die Projektumgebung erstellt wird. Die offiziellen Installationsbefehle unterscheiden sich je nach Betriebssystem.
+
+### macOS / Linux
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Falls curl nicht verfügbar ist, kann alternativ wget verwendet werden:
+
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
+```
+Auf macOS kann uv alternativ auch über Homebrew installiert werden:
+
+```bash
+brew install uv
+```
+
+### Windows PowerShell
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Danach das Terminal beziehungsweise VS Code einmal schließen und neu öffnen.
+
+### Instalation prüfen
+
+Nach der Installation sollte geprüft werden, ob uv korrekt verfügbar ist:
+
+```bash
+uv --version
+```
+
+Wenn eine Versionsnummer ausgegeben wird, ist uv korrekt installiert.
+
+Falls der Befehl unter Windows nicht gefunden wird, ist uv wahrscheinlich noch nicht im PATH. In diesem Fall das Terminal neu öffnen oder Windows neu starten.
 
 ---
 
@@ -97,9 +147,22 @@ die App zeigt Mel-Spektrogramm, CNN-Vorhersage und (optional) BirdNET-Vergleich.
 
 Alternativer Modell-Pfad via Umgebungsvariable:
 
+- macOS / Linux
 ```bash
 BIRD_MODEL_PATH=/pfad/zu/modell.pth uv run streamlit run app.py
 ```
+- Windows PowerShell
+  ```powershell
+  $env:BIRD_MODEL_PATH="C:\Pfad\zu\model_best.pth" uv run streamlit run app.py
+  ```
+
+- Windows CMD
+  ```cmd
+  set BIRD_MODEL_PATH=C:\Pfad\zu\model_best.pth
+  uv run streamlit run app.py
+  ```
+
+---
 
 ### Modell selbst trainieren
 
