@@ -1,49 +1,64 @@
 # cut_audio.py
-# Schneidet alle konfigurierten Vogelaufnahmen parallel in 5-Sekunden-WAV-Clips.
-# Ziel-Arten: Score-basiertes Routing (Clips vs. Background).
-# Background-Arten: alle Clips direkt → data/Background/clips/.
+# Schneidet Vogelaufnahmen in 5-Sekunden-WAV-Clips und sortiert sie per YAMNet.
+#
+# Ablauf:
+#   1. Alle Aufnahmen werden in 5-s-Segmente geschnitten (librosa, 32 kHz —
+#      identisch zu Notebook/app.py). Pro Segment wird zusaetzlich eine 16-kHz-
+#      Kopie fuer YAMNet abgelegt.
+#   2. YAMNet (isolierter Subprocess, src/yamnet_worker.py) bewertet je Segment
+#      den Vogel-Anteil [0, 1].
+#   3. Routing:
+#        - PROCESS_SPECIES: Segment MIT Vogel        -> data/<Art>/clips/
+#                           Segment OHNE Vogel        -> data/Background/clips/
+#          (Stille, Schweigen, Rauschen aus Zielart-Aufnahmen MUESSEN in den
+#           Background — das ist beabsichtigt und wichtig fuer die Klasse.)
+#        - BACKGROUND_SPECIES: ALLE Segmente          -> data/Background/clips/
+#          (Spatz/Taube/Kraehe sind selbst Voegel, nur eben nicht unsere Zielarten
+#           — deshalb hier bewusst KEIN YAMNet-Filter.)
+#
+# YAMNet laeuft als Subprocess, weil TensorFlow und librosa/PyTorch sich im selben
+# Prozess auf macOS nicht zuverlaessig vertragen (vgl. app.py / yamnet_worker.py).
 
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import librosa
-import numpy as np
 import soundfile as sf
 from tqdm import tqdm
 
 # --- ANPASSEN ----------------------------------------------------------------
-# Ziel-Arten: Clips mit hohem Bird-Score → data/<Art>/clips/
-#             Clips mit mittlerem Score  → data/Background/clips/
+# Ziel-Arten: Clips mit Vogel -> data/<Art>/clips/, ohne Vogel -> Background.
 PROCESS_SPECIES = ["Amsel", "Kohlmeise", "Rotkehlchen"]
 
-# Background-Arten: Dateien liegen in data/Background/files/
-#                   → ALLE Clips (inkl. Stille) → data/Background/clips/
+# Background-Arten: ALLE Clips -> data/Background/clips/ (kein YAMNet-Filter).
 BACKGROUND_SPECIES = ["Spatz", "Taube", "Krähe"]
 
-# Basisordner für die Daten (immer relativ zum Projektordner, egal von wo aufgerufen)
+# Basisordner fuer die Daten (immer relativ zum Projektordner, egal von wo aufgerufen).
 BASE_DIR = Path(__file__).parent.parent / "data"
 
 TARGET_LENGTH = 5      # Sekunden
-# 32 kHz: identisch zu Notebook (audio_to_mel) und app.py. Vorher 16 kHz —
-# das führte zu leeren oberen Mel-Bändern und Train/Inferenz-Mismatch.
+# 32 kHz: identisch zu Notebook (audio_to_mel) und app.py. Das ist die Sample-Rate
+# der finalen Clips, mit denen trainiert/inferiert wird.
 SAMPLE_RATE   = 32000
+# YAMNet erwartet exakt 16 kHz mono — dafuer wird pro Segment eine Kopie erzeugt.
+YAMNET_SR     = 16000
 
-# Schwellen für den Vogel-Score (0–1). Nur für PROCESS_SPECIES relevant.
-# BACKGROUND_THRESHOLD leicht anpassen falls zu viele/wenige BG-Clips entstehen.
-HARD_NEGATIVE_THRESHOLD = 0.40
-BACKGROUND_THRESHOLD    = 0.15
-
-# Frequenzband für den Heuristik-Score (vogelrelevant, unabhängig von SAMPLE_RATE).
-# Der Score misst den Energieanteil oberhalb 1 kHz; SCORE_FMAX begrenzt den
-# betrachteten Bereich, damit die Schwellen bei jeder Sample-Rate gleich wirken.
-SCORE_FMAX = 8000
+# YAMNet-Vogel-Score [0, 1], ab dem ein Zielart-Segment als "Vogel vorhanden" gilt.
+# Darunter -> Background (Stille/Rauschen aus Zielart-Aufnahmen landen hier).
+# Hoeher  = strengere Zielklasse (mehr Segmente wandern in Background),
+# niedriger = mehr (auch leise/zweifelhafte) Segmente bleiben in der Zielklasse.
+BIRD_PRESENCE_THRESHOLD = 0.20
 # -----------------------------------------------------------------------------
 
 OUTPUT_BG = BASE_DIR / "Background" / "clips"
-
-# Erster Mel-Bin oberhalb 1 kHz (für bird_score). Einmal berechnet statt hart "45".
-_MEL_FREQS = librosa.mel_frequencies(n_mels=128, fmax=SCORE_FMAX)
-_BIRD_BIN = int(np.argmax(_MEL_FREQS >= 1000))
+YAMNET_WORKER = Path(__file__).parent / "yamnet_worker.py"
 
 for _name in BACKGROUND_SPECIES:
     if _name in PROCESS_SPECIES:
@@ -53,116 +68,209 @@ for _name in BACKGROUND_SPECIES:
         )
 
 
-def bird_score(y: np.ndarray) -> float:
+def _mp3_files(input_dir: Path, name: str) -> list[Path]:
+    """MP3s in input_dir, deren Name mit der Art beginnt. Fehlt der Ordner → []."""
+    if not input_dir.is_dir():
+        tqdm.write(f"[{name}] Ordner fehlt: {input_dir}")
+        return []
+    return sorted(p for p in input_dir.iterdir()
+                  if p.name.startswith(name) and p.suffix == ".mp3")
+
+
+def segment_process_species(name: str, stage32: Path, stage16: Path,
+                            position: int) -> dict[str, str]:
+    """Schneidet eine Ziel-Art und stagt 32-kHz- + 16-kHz-Segmente.
+
+    Gibt ein Manifest {stem: art} zurueck; das Routing entscheidet spaeter
+    anhand der YAMNet-Scores, wohin jedes Segment wandert.
     """
-    Librosa-basierter Vogelanteil-Score in [0, 1].
-
-    Kombiniert zwei Merkmale:
-      1. Energie im Vogelfrequenzbereich (> 1 kHz)
-      2. Tonalität (niedrige spektrale Flachheit => tonales, vogelähnliches Signal)
-    """
-    if np.abs(y).max() < 1e-3:
-        return 0.0
-    S = librosa.feature.melspectrogram(y=y, sr=SAMPLE_RATE, n_mels=128, fmax=SCORE_FMAX)
-    total = float(S.sum()) + 1e-12
-    ratio = float(S[_BIRD_BIN:, :].sum()) / total
-    flatness = float(librosa.feature.spectral_flatness(y=y).mean())
-    tonality = float(np.exp(-8.0 * flatness))
-    return float(np.clip(0.6 * ratio + 0.4 * tonality, 0.0, 1.0))
-
-
-def process_species(name: str, is_background: bool, position: int) -> tuple[int, int]:
-    """Verarbeitet alle MP3s einer Art. Gibt (clip_count, bg_count) zurück."""
-    if is_background:
-        input_dir = BASE_DIR / "Background" / "files"
-        clip_dir = OUTPUT_BG
-    else:
-        input_dir = BASE_DIR / name / "files"
-        clip_dir = BASE_DIR / name / "clips"
-        clip_dir.mkdir(parents=True, exist_ok=True)
-
-    OUTPUT_BG.mkdir(parents=True, exist_ok=True)
-
-    files = sorted(p for p in input_dir.iterdir()
-                   if p.name.startswith(name) and p.suffix == ".mp3")
-
+    files = _mp3_files(BASE_DIR / name / "files", name)
+    manifest: dict[str, str] = {}
     if not files:
-        tqdm.write(f"[{name}] Keine MP3-Dateien in {input_dir}")
-        return 0, 0
+        return manifest
 
     step = TARGET_LENGTH * SAMPLE_RATE
-    clip_count = 0
-    bg_count = 0
-
-    bar = tqdm(
-        total=len(files),
-        desc=f"{name}",
-        unit="file",
-        position=position,
-        leave=True,
-        dynamic_ncols=True,
-    )
+    bar = tqdm(total=len(files), desc=f"{name} schneiden", unit="file",
+               position=position, leave=True, dynamic_ncols=True)
 
     for path in files:
         try:
             y, _ = librosa.load(path, sr=SAMPLE_RATE, mono=True)
-
             for i in range(0, len(y), step):
-                segment = y[i : i + step]
+                segment = y[i:i + step]
                 if len(segment) < step:
                     continue
-
-                if is_background:
-                    out_name = f"{name}_{path.stem}_{i}_bg.wav"
-                    sf.write(OUTPUT_BG / out_name, segment, SAMPLE_RATE)
-                    bg_count += 1
-                else:
-                    score = bird_score(segment)
-                    if score >= HARD_NEGATIVE_THRESHOLD:
-                        out_name = f"{name}_{path.stem}_{i}_hardneg.wav"
-                        sf.write(clip_dir / out_name, segment, SAMPLE_RATE)
-                        clip_count += 1
-                    elif score >= BACKGROUND_THRESHOLD:
-                        out_name = f"{name}_{path.stem}_{i}_bg.wav"
-                        sf.write(OUTPUT_BG / out_name, segment, SAMPLE_RATE)
-                        bg_count += 1
-
+                # stem ist global eindeutig (Art-Praefix + Quelldatei + Offset).
+                stem = f"{name}_{path.stem}_{i}"
+                sf.write(stage32 / f"{stem}.wav", segment, SAMPLE_RATE)
+                seg16 = librosa.resample(segment, orig_sr=SAMPLE_RATE, target_sr=YAMNET_SR)
+                sf.write(stage16 / f"{stem}.wav", seg16, YAMNET_SR)
+                manifest[stem] = name
         except Exception as e:
             tqdm.write(f"[{name}] Fehler bei {path.name}: {e}")
-
         bar.update(1)
 
     bar.close()
-    label = "Clips" if not is_background else "BG-Clips"
-    count = clip_count if not is_background else bg_count
-    tqdm.write(f"[{name}] Fertig — {count} {label}, {bg_count if not is_background else 0} Background-Clips")
-    return clip_count, bg_count
+    return manifest
+
+
+def process_background_species(name: str, position: int) -> int:
+    """Schneidet eine Background-Art; ALLE Segmente -> data/Background/clips/.
+
+    Background-Aufnahmen liegen gemeinsam in data/Background/files/ und werden
+    nur nach Namens-Praefix der Art gefiltert. Kein YAMNet — alles ist Background.
+    """
+    files = _mp3_files(BASE_DIR / "Background" / "files", name)
+    if not files:
+        return 0
+
+    step = TARGET_LENGTH * SAMPLE_RATE
+    count = 0
+    bar = tqdm(total=len(files), desc=f"{name} (BG)", unit="file",
+               position=position, leave=True, dynamic_ncols=True)
+
+    for path in files:
+        try:
+            y, _ = librosa.load(path, sr=SAMPLE_RATE, mono=True)
+            for i in range(0, len(y), step):
+                segment = y[i:i + step]
+                if len(segment) < step:
+                    continue
+                out_name = f"{name}_{path.stem}_{i}_bg.wav"
+                sf.write(OUTPUT_BG / out_name, segment, SAMPLE_RATE)
+                count += 1
+        except Exception as e:
+            tqdm.write(f"[{name}] Fehler bei {path.name}: {e}")
+        bar.update(1)
+
+    bar.close()
+    tqdm.write(f"[{name}] Fertig — {count} Background-Clips")
+    return count
+
+
+def run_yamnet(yamnet_dir: Path) -> dict[str, float]:
+    """Ruft den YAMNet-Worker als Subprocess auf -> {stem: bird_score}."""
+    n = len(list(yamnet_dir.glob("*.wav")))
+    if n == 0:
+        return {}
+
+    tqdm.write(f"\n[YAMNet] Bewerte {n} Zielart-Segmente im Subprocess ...")
+    # stderr (Modell-Laden + Fortschritt) erbt die Konsole; nur stdout = JSON.
+    result = subprocess.run(
+        [sys.executable, str(YAMNET_WORKER), str(yamnet_dir)],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"[YAMNet] Subprocess fehlgeschlagen (Code {result.returncode}). "
+            "Siehe stderr oben."
+        )
+    try:
+        raw = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise SystemExit(
+            f"[YAMNet] Konnte Worker-Output nicht parsen: {result.stdout[:300]!r}"
+        )
+    # Worker liefert {dateiname.wav: score} -> auf stem reduzieren.
+    return {Path(k).stem: float(v) for k, v in raw.items()}
+
+
+def route_by_score(manifest: dict[str, str], scores: dict[str, float],
+                   stage32: Path) -> tuple[int, int]:
+    """Verschiebt gestagte 32-kHz-Clips anhand der YAMNet-Scores an ihr Ziel."""
+    clips = 0
+    bg = 0
+    missing = 0
+
+    for stem, species in tqdm(manifest.items(), desc="Routing", unit="clip",
+                              dynamic_ncols=True):
+        src = stage32 / f"{stem}.wav"
+        if not src.exists():
+            continue
+
+        score = scores.get(stem)
+        if score is None:
+            # Kein Score (Worker hat Segment nicht bewertet) -> sicherheitshalber
+            # als "kein Vogel" behandeln und in den Background legen.
+            missing += 1
+            score = 0.0
+
+        if score >= BIRD_PRESENCE_THRESHOLD:
+            dest = BASE_DIR / species / "clips" / f"{stem}.wav"
+            clips += 1
+        else:
+            # Stille / Rauschen / kein Zielvogel -> Background (beabsichtigt!).
+            dest = OUTPUT_BG / f"{stem}_nobird_bg.wav"
+            bg += 1
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dest))
+
+    if missing:
+        tqdm.write(f"[Routing] ⚠️ {missing} Segmente ohne YAMNet-Score → als Background behandelt.")
+    return clips, bg
 
 
 if __name__ == "__main__":
-    all_species = [(name, False) for name in PROCESS_SPECIES] + \
-                  [(name, True)  for name in BACKGROUND_SPECIES]
+    if not (PROCESS_SPECIES or BACKGROUND_SPECIES):
+        raise SystemExit("Keine Arten konfiguriert. Bitte PROCESS_SPECIES oder BACKGROUND_SPECIES befuellen.")
+    if PROCESS_SPECIES and not YAMNET_WORKER.exists():
+        raise SystemExit(f"YAMNet-Worker nicht gefunden: {YAMNET_WORKER}")
 
-    if not all_species:
-        raise SystemExit("Keine Arten konfiguriert. Bitte PROCESS_SPECIES oder BACKGROUND_SPECIES befüllen.")
+    OUTPUT_BG.mkdir(parents=True, exist_ok=True)
+    for _name in PROCESS_SPECIES:
+        (BASE_DIR / _name / "clips").mkdir(parents=True, exist_ok=True)
 
     tqdm.write(f"Ziel-Arten:       {', '.join(PROCESS_SPECIES) if PROCESS_SPECIES else '(keine)'}")
-    tqdm.write(f"Background-Arten: {', '.join(BACKGROUND_SPECIES) if BACKGROUND_SPECIES else '(keine)'}\n")
+    tqdm.write(f"Background-Arten: {', '.join(BACKGROUND_SPECIES) if BACKGROUND_SPECIES else '(keine)'}")
+    tqdm.write(f"YAMNet-Schwelle:  {BIRD_PRESENCE_THRESHOLD}\n")
 
-    with ThreadPoolExecutor(max_workers=len(all_species)) as executor:
-        futures = {
-            executor.submit(process_species, name, is_bg, i): name
-            for i, (name, is_bg) in enumerate(all_species)
-        }
-        total_clips = 0
-        total_bg = 0
-        for future in as_completed(futures):
-            name = futures[future]
-            try:
-                clips, bg = future.result()
-                total_clips += clips
-                total_bg += bg
-            except Exception as e:
-                tqdm.write(f"[{name}] Fehler: {e}")
+    with tempfile.TemporaryDirectory(prefix="cutaudio_") as _tmp:
+        tmp = Path(_tmp)
+        stage32 = tmp / "clips32"   # finale 32-kHz-Clips (werden spaeter verschoben)
+        stage16 = tmp / "yamnet16"  # 16-kHz-Kopien nur fuer YAMNet
+        stage32.mkdir()
+        stage16.mkdir()
 
-    tqdm.write(f"\nAlle Arten verarbeitet. Gesamt: {total_clips} Clips, {total_bg} Background-Clips.")
+        # --- Phase 1: Segmentieren (parallel pro Art) -----------------------
+        jobs = [(n, False) for n in PROCESS_SPECIES] + \
+               [(n, True) for n in BACKGROUND_SPECIES]
+
+        manifest: dict[str, str] = {}
+        bg_from_species = 0
+
+        with ThreadPoolExecutor(max_workers=max(1, len(jobs))) as executor:
+            futures = {}
+            for pos, (name, is_bg) in enumerate(jobs):
+                if is_bg:
+                    fut = executor.submit(process_background_species, name, pos)
+                    futures[fut] = ("bg", name)
+                else:
+                    fut = executor.submit(segment_process_species, name, stage32, stage16, pos)
+                    futures[fut] = ("proc", name)
+
+            for future in as_completed(futures):
+                kind, name = futures[future]
+                try:
+                    res = future.result()
+                    if kind == "bg":
+                        bg_from_species += res
+                    else:
+                        manifest.update(res)
+                except Exception as e:
+                    tqdm.write(f"[{name}] Fehler: {e}")
+
+        # --- Phase 2: YAMNet bewertet die Zielart-Segmente ------------------
+        scores = run_yamnet(stage16)
+
+        # --- Phase 3: Routing anhand der Scores -----------------------------
+        clips, bg_from_targets = route_by_score(manifest, scores, stage32)
+
+    tqdm.write(
+        f"\nFertig.\n"
+        f"  Ziel-Clips (mit Vogel):              {clips}\n"
+        f"  Background aus Zielarten (kein Vogel): {bg_from_targets}\n"
+        f"  Background aus Background-Arten:       {bg_from_species}\n"
+        f"  Background gesamt:                     {bg_from_targets + bg_from_species}"
+    )

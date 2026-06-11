@@ -57,16 +57,18 @@ uv run python src/build_dataset.py
 ```bash
 # Notebook im Browser öffnen (Projekt-Root als Arbeitsverzeichnis)
 uv run jupyter lab notebooks/bird_training.ipynb
-# Ergebnis: model_best.pth + model.pth im Projektordner
+# Ergebnis: models/birdcnn_<timestamp>_best.pth (eindeutiger Name pro Lauf,
+# überschreibt nie das mitgelieferte models/birdcnn_release.pth)
 ```
 
 ### Inferenz / App starten
 
 ```bash
-# Setzt model_best.pth im Projektordner voraus
+# Lädt standardmäßig models/birdcnn_release.pth; per Dropdown (Sidebar) kann
+# jedes weitere models/*.pth ausgewählt werden.
 uv run streamlit run app.py
 
-# Alternativer Modell-Pfad
+# Festen Modell-Pfad erzwingen (hat Vorrang vor dem Dropdown)
 BIRD_MODEL_PATH=/pfad/zu/modell.pth uv run streamlit run app.py
 ```
 
@@ -93,8 +95,9 @@ bird-classifier/
 ├── data_splits/    # CSV-Splits (train/val/test) — nicht committed
 ├── docs/           # Projektdokumentation (structure.md, crisp-dm.md)
 ├── app.py          # Streamlit-Anwendung (Einstiegspunkt)
-├── model_best.pth  # Bestes Modell nach Val-Accuracy
-├── model.pth       # Finales Modell (letzte Trainingsepoche)
+├── models/         # Modell-Artefakte
+│   ├── birdcnn_release.pth          # mitgeliefertes Modell (committed)
+│   └── birdcnn_<timestamp>_best.pth # selbst trainiert (gitignored)
 ├── pyproject.toml      # Abhängigkeitsdefinition (UV)
 ├── uv.lock             # Reproduzierbares Lockfile
 ├── setup_check.py
@@ -106,7 +109,9 @@ bird-classifier/
 
 - Python-Skripte: `snake_case.py`
 - Notebooks: beschreibender Name (`bird_training.ipynb`)
-- Modell-Artefakte: `model_best.pth` (bester Checkpoint), `model.pth` (finale Epoche)
+- Modell-Artefakte (in `models/`): `birdcnn_release.pth` (mitgeliefert, committed),
+  `birdcnn_<timestamp>_best.pth` (selbst trainiert, gitignored). Die App lädt
+  standardmäßig das Release-Modell; weitere `models/*.pth` sind im Dropdown wählbar.
 - CSV-Splits: `train.csv`, `val.csv`, `test.csv` → liegen in `data_splits/`
 - Klassen-Reihenfolge (fest): `Amsel=0, Kohlmeise=1, Rotkehlchen=2, Background=3`
 
@@ -151,7 +156,7 @@ Danach Pull Request öffnen und reviewen lassen — kein direktes Merge in `main
 - Vor Änderungen an der Vorverarbeitung sowohl `app.py` als auch das Notebook
   prüfen — Parameter müssen übereinstimmen (32 kHz, 128 Mel-Bänder, 313 Frames,
   Normalisierung auf mean=0, std=1).
-- BirdNET läuft absichtlich in einem Subprocess (`app.py`, Zeile ~117).
+- BirdNET läuft absichtlich in einem Subprocess (`app.py`, Zeile ~138).
   Grund: PyTorch und TensorFlow-Lite vertragen sich im selben Prozess nicht.
 - `data/` und `data_splits/` sind gitignored — nur `.gitkeep` ist committed.
   Keine Binärdaten oder großen Audiodateien committen.
@@ -165,5 +170,7 @@ Danach Pull Request öffnen und reviewen lassen — kein direktes Merge in `main
   nicht ohne Anpassung von `app.py` und Notebook ändern.
 - Keine neuen Abhängigkeiten ohne Eintrag in `pyproject.toml` einführen.
   Danach `uv sync` ausführen, damit `uv.lock` aktualisiert wird.
-- `model_best.pth` ist ein Binär-Artefakt — nicht in Textdokumenten als
-  Quellcode behandeln oder verändern.
+- `models/birdcnn_release.pth` ist ein committetes Binär-Artefakt — nicht in
+  Textdokumenten als Quellcode behandeln oder verändern. Training überschreibt es
+  nie (eindeutige Zeitstempel-Namen); ein neues Release wird bewusst durch
+  Umbenennen nach `birdcnn_release.pth` gesetzt.
