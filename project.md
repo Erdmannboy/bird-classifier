@@ -63,17 +63,18 @@ Die Labels für die drei Vogelarten ergeben sich direkt aus dem Download – was
 Amsel suchen, bekommt das Label Amsel usw. (numerisch: Amsel = 0, Kohlmeise = 1,
 Rotkehlchen = 2, Background = 3). Für "Background" haben wir nicht von Hand gelabelt,
 sondern das vortrainierte Google-Modell **YAMNet** als Qualitätskontrolle eingesetzt
-(`cut_audio.py`). YAMNet schätzt pro Clip, wie stark Vogelgeräusche vorkommen. Daraus
-entstanden zwei Arten von Background: "Hard Negatives" (klar hörbarer, aber fremder
-Vogel wie Taube oder Krähe, YAMNet-Score ≥ 0.40) und normaler Hintergrund (schwache
-oder diffuse Geräusche, Score ≥ 0.15). Wichtig: YAMNet bestimmt nicht die Vogelart,
-sondern dient nur dem Aufräumen der Daten.
+(`cut_audio.py`, in einem isolierten Subprozess). YAMNet erkennt pro Clip, ob ein Vogel
+hörbar ist (Maximum über die Zeitfenster, ab Score 0.20). Die Background-Klasse speist
+sich daraus aus zwei Quellen: Zielart-Segmente **ohne** erkannten Vogel (Stille,
+Rauschen) und die bewusst geladenen Fremdvögel (Taube, Krähe, Spatz), die als
+"Hard Negatives" komplett in den Background gehen. Wichtig: YAMNet bestimmt nicht die
+Vogelart, sondern nur, ob überhaupt ein Vogel da ist.
 
 ### Risks
 
 Die größten Risiken waren: verrauschte Clips, die trotzdem als Vogel gelabelt sind
-(genau das ist uns am Anfang passiert), Label-Rauschen durch die selbst gesetzten
-YAMNet-Schwellen, ein anfängliches Ungleichgewicht zugunsten des Hintergrunds, und die
+(genau das ist uns am Anfang passiert), Label-Rauschen durch die selbst gesetzte
+YAMNet-Schwelle, ein anfängliches Ungleichgewicht zugunsten des Hintergrunds, und die
 begrenzte Generalisierung – nur drei Arten, Daten überwiegend aus relativ sauberen
 Einzelaufnahmen. Außerdem das Risiko von Data Leakage, wenn Clips derselben
 Originalaufnahme in Train und Test landen (siehe Abschnitt 5).
@@ -96,8 +97,8 @@ Statt eigener Forschung haben wir bestehende Werkzeuge kombiniert. Die wichtigst
 **Schneiden in Clips:** Die langen MP3s sind als Ganzes nicht zum Trainieren geeignet.
 Mit `cut_audio.py` schneiden wir sie in 5-Sekunden-Clips und speichern sie als WAV.
 Kurze Segmente sind ein gängiger Standard für Audio-Klassifikation und reduzieren
-unnötigen Hintergrund. Im selben Schritt sortiert YAMNet jeden Clip in Background bzw.
-Hard Negatives ein.
+unnötigen Hintergrund. Im selben Schritt entscheidet YAMNet pro Zielart-Clip, ob ein
+Vogel hörbar ist: Segmente ohne Vogel (Stille/Rauschen) wandern in die Background-Klasse.
 
 **Feature-Berechnung:** Jeder Clip wird in ein Mel-Spektrogramm umgewandelt (32 kHz,
 128 Mel-Bänder, `fmax` = 16 kHz). Die Breite wird fest auf 313 Frames gebracht (zu
@@ -136,7 +137,9 @@ SpecAugment (Frequenz- und Zeit-Masking) zum Einsatz, um Overfitting zu reduzier
 Trainiert wurde über 20 Epochen mit Batch-Größe 32, CrossEntropy-Loss (Label Smoothing
 0.1), dem AdamW-Optimizer (lr = 1e-3, weight decay = 1e-4) und einem CosineAnnealing-
 Scheduler. Nach jeder Epoche haben wir auf der Validierung gemessen und jeweils das beste
-Modell als `model_best.pth` gespeichert; das finale Modell zusätzlich als `model.pth`.
+Modell unter einem eindeutigen Namen `models/birdcnn_<timestamp>_best.pth` gespeichert
+(so überschreibt ein neuer Lauf das mitgelieferte `birdcnn_release.pth` nie). Es wird nur
+der beste Checkpoint gespeichert.
 
 ## 7. Evaluation
 
@@ -196,14 +199,15 @@ streamlit run app.py
 
 In der App kann man eine WAV-Datei hochladen oder live aufnehmen, sieht das
 Mel-Spektrogramm, wählt einen 5-Sekunden-Ausschnitt und bekommt die Vorhersage unseres
-eigenen CNN (`model_best.pth`) – die Klasse "Background" wird dabei als "Kein Vogel"
+eigenen CNN (`models/birdcnn_release.pth`) – die Klasse "Background" wird dabei als "Kein Vogel"
 angezeigt. Zusätzlich wird dieselbe Aufnahme von BirdNET analysiert und das Ergebnis
 gegenübergestellt. BirdNET läuft bewusst in einem eigenen Subprozess, weil sich PyTorch
 und TensorFlow-Lite sonst in die Quere kommen.
 
 Damit Training und App zusammenpassen, ist die Vorverarbeitung in der App identisch zum
 Training (32 kHz, 128 Mel-Bänder, 313 Frames, gleiche Normalisierung). Die benötigten
-Bibliotheken stehen in `requirements.txt`.
+Bibliotheken sind in `pyproject.toml` definiert und über `uv sync` reproduzierbar
+installierbar.
 
 ## 9. Reflection
 

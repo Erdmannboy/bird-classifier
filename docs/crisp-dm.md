@@ -85,7 +85,7 @@ Aus dem Audiosignal werden **Mel-Spektrogramme** berechnet:
 
 | Parameter | Wert |
 | --- | --- |
-| Sampling-Rate | 32.000 Hz (Zielklassen) / 16.000 Hz (Background-Schnitt) |
+| Sampling-Rate | 32.000 Hz (alle Clips); YAMNet-Bewertung intern bei 16.000 Hz |
 | Mel-Bänder | 128 |
 | fmax | 16.000 Hz |
 | Zeitfenster | feste Breite von 313 Frames (Padding / Crop) |
@@ -100,7 +100,10 @@ Inferenz: `app.py` (Funktion `array_to_mel_for_model`)
 - **Zielarten:** Klasse ergibt sich direkt aus dem Download (was als Amsel gesucht
   wird, erhält das Label Amsel).
 - **Background:** Kein manuelles Labeling. Das vortrainierte Google-Modell
-  **YAMNet** bewertet pro Clip den Vogel-Score (Skript: `src/cut_audio.py`).
+  **YAMNet** erkennt pro Clip, ob ein Vogel hörbar ist (Skript: `src/cut_audio.py`).
+  Zielart-Segmente ohne erkannten Vogel (Stille/Rauschen) wandern automatisch in
+  die Background-Klasse; die Background-Arten (Krähe/Taube/Spatz) liefern zusätzlich
+  klare Fremdvogel-Negative.
 
 ### Datensatzgröße (nach Vorverarbeitung)
 
@@ -119,7 +122,7 @@ Klassenverteilung im Trainingsset: ≈ 1.888 Amsel, 1.939 Kohlmeise,
 ### Identifizierte Risiken
 
 - Verrauschte Clips trotz Qualitätsstufe A → gelöst durch YAMNet-Filterung
-- Label-Rauschen durch selbst gesetzte YAMNet-Schwellen
+- Label-Rauschen durch die selbst gesetzte YAMNet-Schwelle
 - Generalisierungslücke: Daten aus relativ sauberen Einzelaufnahmen,
   keine Feldaufnahmen
 - Data Leakage (wenn Clips derselben Aufnahme in Train und Test landen)
@@ -148,20 +151,28 @@ Der wichtigste Unterschied zu BirdNET besteht darin, dass unser Modell bewusst a
 
 **Skript:** `src/cut_audio.py`
 
-Lange MP3-Aufnahmen werden in **5-Sekunden-WAV-Segmente** zerschnitten.
-Kurze Rest-Segmente am Ende werden verworfen.
+Lange MP3-Aufnahmen werden in **5-Sekunden-WAV-Segmente** zerschnitten (32 kHz,
+identisch zu Training und Inferenz). Kurze Rest-Segmente am Ende werden verworfen.
 
-YAMNet (geladen via `tensorflow_hub`) klassifiziert jeden Clip:
+**YAMNet** läuft in einem **isolierten Subprozess** (`src/yamnet_worker.py`), da
+sich TensorFlow und PyTorch im selben Prozess nicht zuverlässig vertragen. Es
+bewertet pro Segment, ob ein Vogel hörbar ist — als **Maximum über die Zeitfenster**
+des Clips, damit auch kurze Gesangsphasen erkannt werden. Davon hängt das Routing ab:
 
-| YAMNet Vogel-Score | Zuweisung | Dateiname-Suffix |
+**Zielarten** (Amsel, Kohlmeise, Rotkehlchen):
+
+| YAMNet-Vogel-Score | Zuweisung | Ziel |
 | --- | --- | --- |
-| ≥ 0,40 | Hard Negative (fremder Vogel klar hörbar) | `_hardneg.wav` |
-| ≥ 0,15 | Background (schwacher/diffuser Vogel) | `_bg.wav` |
-| < 0,15 | Verworfen | — |
+| ≥ 0,20 (`BIRD_PRESENCE_THRESHOLD`) | Vogel hörbar | `data/<Art>/clips/` |
+| < 0,20 | kein Vogel (Stille/Rauschen) | `data/Background/clips/` (`…_nobird_bg.wav`) |
 
-Ausgabe: `data/<Klasse>/clips/`
+**Background-Arten** (Krähe, Taube, Spatz): **alle** Segmente → `data/Background/clips/`
+(`…_bg.wav`), **ohne** YAMNet — diese Arten sind selbst Vögel, nur eben nicht unsere
+Zielarten, und dienen als klare Fremdvogel-Negative.
 
-YAMNet bestimmt **nicht** die Vogelart, sondern dient nur der Qualitätskontrolle.
+Wichtig: Es wird **nichts verworfen** — Stille und Rauschen aus Zielart-Aufnahmen
+gehören bewusst in die Background-Klasse, damit das Modell „kein Zielvogel" lernt.
+YAMNet bestimmt **nicht** die Vogelart, sondern nur, ob überhaupt ein Vogel da ist.
 
 ### Schritt 2 — Feature-Berechnung
 
@@ -252,9 +263,10 @@ Input: (B, 1, 128, 313)  ← Mel-Spektrogramm, Batch × Kanal × Freq × Zeit
 ### Modell-Checkpointing
 
 Nach jeder Epoche wird auf der Validierung evaluiert. Wenn `val_acc` den
-bisherigen Bestwert übertrifft, wird der State-Dict als `model_best.pth`
-gespeichert. Am Ende wird das finale Modell zusätzlich als `model.pth`
-gespeichert.
+bisherigen Bestwert übertrifft, wird der State-Dict gespeichert — unter einem
+eindeutigen Namen `models/birdcnn_<timestamp>_best.pth`, sodass ein neuer Lauf das
+mitgelieferte `models/birdcnn_release.pth` nie überschreibt. Gespeichert wird nur
+der beste Checkpoint (keine separate Datei für die letzte Epoche).
 
 ### Erste Modellversion (Baseline)
 
@@ -271,8 +283,9 @@ Daraus entstand die Idee zur YAMNet-Bereinigung und der Background-Klasse.
 
 ### Methode
 
-Bewertet wird auf dem zuvor unberührten Test-Set (2.086 Clips) mit dem
-`model_best.pth`-Checkpoint (bestes Val-Ergebnis aus Epoche 2: 87,32 %).
+Bewertet wird auf dem zuvor unberührten Test-Set (2.086 Clips) mit dem besten
+Checkpoint (mitgeliefert als `models/birdcnn_release.pth`; bestes Val-Ergebnis aus
+Epoche 2: 87,32 %).
 
 Metriken berechnet mit `sklearn.metrics` in `notebooks/bird_training.ipynb`.
 
@@ -348,7 +361,9 @@ Kein Docker-Image, kein Cloud-Deployment vorhanden.
 
 ### Modell-Pfad
 
-Standardmäßig `model_best.pth` im Projektordner, überschreibbar via:
+Die App lädt standardmäßig `models/birdcnn_release.pth`. In der Sidebar kann per
+Dropdown jedes weitere `models/*.pth` (z. B. ein selbst trainierter Checkpoint)
+gewählt werden. Ein fester Pfad lässt sich erzwingen via:
 
 ```bash
 BIRD_MODEL_PATH=/pfad/zu/modell.pth streamlit run app.py
