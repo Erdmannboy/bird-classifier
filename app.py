@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+from pathlib import Path
 import librosa
 import librosa.display
 import matplotlib.patches as patches
@@ -39,9 +40,29 @@ BIRDNET_SCIENTIFIC_TO_LOCAL = {
     "Erithacus rubecula": "Rotkehlchen",
 }
 
-# ANPASSEN: Pfad zum trainierten Modell. Standard = "model_best.pth" im selben
-# Ordner; alternativ per Umgebungsvariable BIRD_MODEL_PATH ueberschreiben.
-MODEL_PATH = os.environ.get("BIRD_MODEL_PATH", "model_best.pth")
+# Modelle liegen in models/. Das mitgelieferte Modell heisst birdcnn_release.pth
+# (committed). Selbst trainierte Checkpoints (birdcnn_<timestamp>_best.pth) landen
+# ebenfalls hier und sind im Dropdown waehlbar. BIRD_MODEL_PATH ueberschreibt die
+# Auswahl mit einem festen Pfad (z. B. fuer Tests/Deployment).
+MODELS_DIR = Path(__file__).resolve().parent / "models"
+RELEASE_MODEL = "birdcnn_release.pth"
+ENV_MODEL_PATH = os.environ.get("BIRD_MODEL_PATH")
+
+
+def discover_models() -> list[Path]:
+    """Alle .pth in models/ — Release zuerst, danach neueste zuerst."""
+    if not MODELS_DIR.is_dir():
+        return []
+    paths = list(MODELS_DIR.glob("*.pth"))
+    return sorted(
+        paths,
+        key=lambda p: (0 if p.name == RELEASE_MODEL else 1, -p.stat().st_mtime),
+    )
+
+
+def model_label(p: Path) -> str:
+    """Anzeigename im Dropdown."""
+    return f"{p.stem}  ⭐ (Release)" if p.name == RELEASE_MODEL else p.stem
 
 TARGET_SR = 32000
 TARGET_DURATION = 5.0
@@ -102,9 +123,9 @@ class BirdCNN(nn.Module):
 # ======================================
 
 @st.cache_resource
-def load_model():
+def load_model(model_path: str):
     m = BirdCNN(num_classes=len(MODEL_CLASSES))
-    m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+    m.load_state_dict(torch.load(model_path, map_location="cpu"))
     m.eval()
     return m
 
@@ -344,11 +365,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================================
-# MODELL LADEN (mit Fehlerbehandlung)
+# MODELL-AUSWAHL + LADEN (mit Fehlerbehandlung)
 # ======================================
 
+# BIRD_MODEL_PATH (falls gesetzt) hat Vorrang vor der Dropdown-Auswahl.
+if ENV_MODEL_PATH:
+    selected_path = ENV_MODEL_PATH
+    st.sidebar.info(f"⚙️ Modell via `BIRD_MODEL_PATH`:\n\n`{ENV_MODEL_PATH}`")
+else:
+    available_models = discover_models()
+    if available_models:
+        st.sidebar.markdown("### ⚙️ Modell")
+        choice = st.sidebar.selectbox(
+            "Aktives Modell",
+            options=available_models,
+            format_func=model_label,
+            label_visibility="collapsed",
+        )
+        selected_path = str(choice)
+        st.sidebar.caption(
+            f"{len(available_models)} Modell(e) in `models/`. "
+            "Eigene Trainings erscheinen hier automatisch."
+        )
+    else:
+        # Kein Modell gefunden — Fallback-Pfad fuer eine klare Fehlermeldung.
+        selected_path = str(MODELS_DIR / RELEASE_MODEL)
+
 try:
-    model = load_model()
+    model = load_model(selected_path)
     model_error = None
 except Exception as e:
     model = None
@@ -357,10 +401,10 @@ except Exception as e:
 if model is None:
     st.error(
         f"❌ Mein Modell konnte nicht geladen werden.\n\n"
-        f"Pfad: `{MODEL_PATH}`\n\n"
+        f"Pfad: `{selected_path}`\n\n"
         f"Fehler: `{model_error}`\n\n"
-        f"Trainiere zuerst das Notebook `notebooks/bird_training.ipynb` "
-        f"durch — das speichert `model_best.pth`."
+        f"Erwartet wird `models/{RELEASE_MODEL}`. Trainiere alternativ das Notebook "
+        f"`notebooks/bird_training.ipynb` durch — das legt einen Checkpoint in `models/` ab."
     )
     st.stop()
 
