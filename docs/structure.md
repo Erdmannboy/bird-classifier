@@ -5,12 +5,14 @@
 ```
 bird-classifier/
 ├── app.py
-├── model_best.pth
-├── model.pth
 ├── project.md
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 ├── setup_check.py
 ├── CLAUDE.md
+│
+├── models/
+│   └── birdcnn_release.pth   ← mitgeliefert (weitere Checkpoints gitignored)
 │
 ├── data/
 │   └── .gitkeep
@@ -33,8 +35,9 @@ bird-classifier/
 
 > `data/` und `data_splits/` sind gitignored und enthalten lokal die Rohdaten
 > bzw. die CSV-Splits. Im Repository liegt jeweils nur ein `.gitkeep`.
-> `model_best.pth` und `model.pth` sind Binär-Artefakte und werden direkt
-> im Projektordner abgelegt (nicht in einem Unterordner).
+> Modelle liegen in `models/`. Committet wird nur das mitgelieferte
+> `birdcnn_release.pth`; selbst trainierte Checkpoints (`birdcnn_<timestamp>_best.pth`)
+> sind gitignored.
 
 ---
 
@@ -44,21 +47,22 @@ bird-classifier/
 
 | Pfad | Zweck |
 | --- | --- |
-| `app.py` | Streamlit-Web-App. Lädt `model_best.pth`, nimmt eine WAV-Datei entgegen (Upload oder Live-Aufnahme), zeigt Mel-Spektrogramm mit wählbarem 5-s-Ausschnitt, gibt CNN-Vorhersage und optionalen BirdNET-Vergleich aus. Einstiegspunkt: `streamlit run app.py`. |
+| `app.py` | Streamlit-Web-App. Lädt standardmäßig `models/birdcnn_release.pth` (per Sidebar-Dropdown ist jedes weitere `models/*.pth` wählbar), nimmt eine WAV-Datei entgegen (Upload oder Live-Aufnahme), zeigt Mel-Spektrogramm mit wählbarem 5-s-Ausschnitt, gibt CNN-Vorhersage und optionalen BirdNET-Vergleich aus. Einstiegspunkt: `streamlit run app.py`. |
 | `setup_check.py` | Einfacher Umgebungstest: gibt Python-Version und Versionsnummern der wichtigsten Bibliotheken aus. Kein Unittest-Framework, nur manueller Smoke-Test. |
 
-### Modell-Artefakte
+### Modell-Artefakte (`models/`)
 
 | Pfad | Zweck |
 | --- | --- |
-| `model_best.pth` | PyTorch State-Dict des BirdCNN mit der besten Validation-Accuracy (87,32 %). Wird von `app.py` für Inferenz geladen. |
-| `model.pth` | PyTorch State-Dict der letzten Trainingsepoche (Epoche 20). Als Referenz gespeichert; für die App wird `model_best.pth` bevorzugt. |
+| `models/birdcnn_release.pth` | Mitgeliefertes BirdCNN-State-Dict (committed). Wird von `app.py` standardmäßig geladen. |
+| `models/birdcnn_<timestamp>_best.pth` | Selbst trainierte Checkpoints (bester Val-Wert pro Lauf). Gitignored; in der App per Dropdown wählbar. |
 
 ### Konfiguration & Doku
 
 | Pfad | Zweck |
 | --- | --- |
-| `requirements.txt` | Python-Abhängigkeiten ohne Versionspinning. Sektionen: Grundlagen, Visualisierung, Audio, ML, Streamlit, Xeno-Canto, YAMNet, BirdNET, Notebook, Export. |
+| `pyproject.toml` | Abhängigkeitsdefinition des UV-Projekts (numpy, librosa, torch, tensorflow/-hub, streamlit, birdnetlib u. a.). |
+| `uv.lock` | Reproduzierbares Lockfile — `uv sync` installiert exakt diese Versionen. |
 | `CLAUDE.md` | Schnellreferenz für Claude-Code-Sessions: Befehle, Konventionen, Do's & Don'ts. |
 | `project.md` | Ausführliche ML4B-Projektdokumentation auf Deutsch: Idee, Business Understanding, Daten, Modell, Ergebnisse, Reflexion. |
 
@@ -69,7 +73,7 @@ Die drei Skripte müssen in dieser Reihenfolge ausgeführt werden:
 | Pfad | Schritt | Zweck |
 | --- | --- | --- |
 | `src/bird_data.py` | 1 | Lädt MP3-Aufnahmen von der Xeno-Canto API herunter. Konfigurierbar: Art (`SEARCH_BIRD`), Zielordner (`TARGET_CLASS`), maximale Dateianzahl (`MAX_FILES`), Mindestlänge in Sekunden. Speichert Dateien nach `data/<Klasse>/files/`. |
-| `src/cut_audio.py` | 2 | Schneidet lange MP3s in 5-Sekunden-WAV-Clips. Nutzt YAMNet (TensorFlow Hub) zur Klassifikation: Clips mit Vogel-Score ≥ 0,40 werden als „Hard Negative" markiert, Score ≥ 0,15 als normaler Hintergrund. Ausgabe: `data/<Klasse>/clips/`. |
+| `src/cut_audio.py` | 2 | Schneidet lange MP3s in 5-Sekunden-WAV-Clips (32 kHz). YAMNet (isolierter Subprozess, `src/yamnet_worker.py`) bewertet pro Zielart-Clip die Vogel-Präsenz: Score ≥ 0,20 → `data/<Art>/clips/`, sonst (Stille/Rauschen) → `data/Background/clips/`. Background-Arten (Krähe/Taube/Spatz) gehen komplett ohne YAMNet in den Background. |
 | `src/build_dataset.py` | 3 | Sammelt alle WAV-Clips, vergibt numerische Labels und erzeugt Train/Val/Test-Splits (70 / 15 / 15, Seed=42). Split erfolgt nach `recording_id`, nicht nach einzelnen Clips — verhindert Data Leakage. Ausgabe: `data_splits/train.csv`, `val.csv`, `test.csv`. |
 
 Jedes Skript enthält einen konfigurierbaren Block am Anfang (`# --- ANPASSEN ---`),
@@ -79,7 +83,7 @@ in dem Art, Pfade und Schwellwerte angepasst werden.
 
 | Pfad | Zweck |
 | --- | --- |
-| `notebooks/bird_training.ipynb` | Vollständiges Trainings-Notebook. Liest die CSV-Splits aus `data_splits/`, berechnet Mel-Spektrogramme, definiert BirdCNN (V3), trainiert 20 Epochen mit AdamW + CosineAnnealing, speichert `model_best.pth` und `model.pth` im Projektordner, gibt Classification Report und Confusion Matrix aus. |
+| `notebooks/bird_training.ipynb` | Vollständiges Trainings-Notebook. Liest die CSV-Splits aus `data_splits/`, berechnet Mel-Spektrogramme, definiert BirdCNN (V3), trainiert 20 Epochen mit AdamW + CosineAnnealing, speichert den besten Checkpoint als `models/birdcnn_<timestamp>_best.pth`, gibt Classification Report und Confusion Matrix aus. |
 
 ### Daten — `data/`
 
@@ -87,7 +91,7 @@ in dem Art, Pfade und Schwellwerte angepasst werden.
 | --- | --- |
 | `data/` | Basisordner für alle Rohdaten. Nicht committed (nur `.gitkeep`). |
 | `data/<Klasse>/files/` | MP3-Dateien direkt von Xeno-Canto, erzeugt von `src/bird_data.py`. Klassen: `Amsel`, `Kohlmeise`, `Rotkehlchen`, `Background`. |
-| `data/<Klasse>/clips/` | 5-s-WAV-Clips, erzeugt von `src/cut_audio.py`. Dateiname-Schema: `<Art>_<AufnahmeID>_<Offset>_<bg|hardneg>.wav`. |
+| `data/<Klasse>/clips/` | 5-s-WAV-Clips, erzeugt von `src/cut_audio.py`. Dateiname-Schema: `<Art>_<AufnahmeID>_<Offset>.wav` (erkannter Zielvogel), `…_nobird_bg.wav` (Zielart-Segment ohne Vogel → Background) bzw. `…_bg.wav` (Background-Art). |
 
 ### Splits — `data_splits/`
 
@@ -117,7 +121,7 @@ Spalten je CSV: `path`, `label`, `class_name`, `recording_id`.
 | Jupyter-Notebooks | `notebooks/` |
 | Rohdaten (MP3, WAV) | `data/<Klasse>/files/` bzw. `data/<Klasse>/clips/` — **nicht committen** |
 | CSV-Splits | `data_splits/` — **nicht committen** |
-| Modell-Checkpoints (`.pth`) | Projektordner (`/`) — direkt im Root |
+| Modell-Checkpoints (`.pth`) | `models/` — nur `birdcnn_release.pth` committed |
 | Projektdokumentation (Markdown) | `docs/` |
 | Konfiguration für Claude Code | `CLAUDE.md` im Root |
 
