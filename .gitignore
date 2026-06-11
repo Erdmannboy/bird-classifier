@@ -13,6 +13,16 @@ data/**/*.wav
 data/**/*.WAV
 data_splits/*.csv
 
+# Modelle: nur das mitgelieferte Release-Modell wird committed.
+# Selbst trainierte Checkpoints (birdcnn_<timestamp>_best.pth) bleiben lokal.
+models/*.pth
+!models/birdcnn_release.pth
+
+# Alte Modell-Artefakte im Root (vor models/-Umstellung) nicht versehentlich committen
+/model_best.pth
+/model.pth
+notebooks/*.pth
+
 # Jupyter
 .ipynb_checkpoints/
 
