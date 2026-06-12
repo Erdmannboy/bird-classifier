@@ -500,7 +500,7 @@ st.markdown("""
     .metrics-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     .metrics-table th { background: #f6f9fc; color: #4754c1; padding: 0.55rem 0.4rem;
                         font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .metrics-table td { padding: 0.5rem 0.4rem; text-align: center;
+    .metrics-table td { padding: 0.5rem 0.4rem; text-align: center; color: #2c3e50;
                         border-bottom: 1px solid #eef0f3; font-variant-numeric: tabular-nums; }
     .metrics-table tr.avg td { background: #fafbfc; font-weight: 700; color: #2c3e50; }
 
@@ -671,15 +671,15 @@ def render_model_insights():
     for name, m in PER_CLASS.items():
         info = MODEL_CLASS_INFO[name]
         pct = m["acc"]
-        rows.append(f"""
-        <div class="prob-row">
-            <div class="prob-label"><span class="dot" style="background:{info['color']};"></span>{name}</div>
-            <div class="prob-bar-bg">
-                <div class="prob-bar-fill" style="width:{pct}%; background:{info['color']};"></div>
-            </div>
-            <div class="prob-value">{pct:.2f}%</div>
-        </div>
-        """)
+        rows.append(
+            f'<div class="prob-row">'
+            f'<div class="prob-label"><span class="dot" style="background:{info["color"]};"></span>{name}</div>'
+            f'<div class="prob-bar-bg">'
+            f'<div class="prob-bar-fill" style="width:{pct}%; background:{info["color"]};"></div>'
+            f'</div>'
+            f'<div class="prob-value">{pct:.2f}%</div>'
+            f'</div>'
+        )
     st.markdown(f'<div class="card">{"".join(rows)}</div>', unsafe_allow_html=True)
 
     # ---- Classification Report + Confusion Matrix ----
