@@ -1,7 +1,11 @@
 # CRISP-DM Dokumentation — Bird Species Classifier
 
 Dieses Dokument beschreibt den ML-Entwicklungsprozess entlang der sechs
-CRISP-DM-Phasen. Alle Aussagen beziehen sich auf konkrete Dateien im Repository.
+CRISP-DM-Phasen (Business Understanding, Data Understanding, Data Preparation,
+Modeling, Evaluation, Deployment), ergänzt um die Abschnitte *Related Work* und
+*Future Work*. Alle Aussagen beziehen sich auf konkrete Dateien im Repository;
+Metriken und Datenmengen stammen aus `project.md` und
+`notebooks/bird_training.ipynb`.
 
 ---
 
@@ -29,8 +33,7 @@ zu hören ist (statt eine falsche Art zu erzwingen).
 
 ### Zielgruppe
 
-Hobby-Ornithologen, Naturinteressierte, Gartenbesitzer — keine Fachkenntnisse
-erforderlich.
+Hobby-Ornithologen, Naturinteressierte, Gartenbesitzer — keine Fachkenntnisse erforderlich.
 
 ### Bewertungskriterium
 
@@ -389,8 +392,8 @@ Prozess nicht zuverlässig verträgt. Lösung: BirdNET wird in einem separaten
 Python-Subprocess aufgerufen (`subprocess.run`). Das JSON-Ergebnis wird über
 stdout zurückgegeben. Implementiert in `app.py` als `_BIRDNET_SUBPROCESS_SCRIPT`.
 
-> TODO: Docker-Image für reproduzierbares Deployment erstellen.
-> TODO: Cloud-Deployment (z. B. Streamlit Cloud, Hugging Face Spaces) evaluieren.
+Ein reproduzierbares Deployment (Docker, Cloud) ist noch offen und in Abschnitt 8
+(Future Work) beschrieben.
 
 **Hauptdatei:** `app.py`, `project.md` (Abschnitt 8)
 
@@ -398,5 +401,24 @@ stdout zurückgegeben. Implementiert in `app.py` als `_BIRDNET_SUBPROCESS_SCRIPT
 
 ## 8. Future Work
 
-Mögliche Erweiterungen wären ein Docker-Image für eine reproduzierbare Laufzeitumgebung und ein Cloud-Deployment, zum Beispiel über Streamlit Cloud oder Hugging Face Spaces. Für die aktuelle Kursabgabe wird die Anwendung lokal über `streamlit run app.py` ausgeführt.
+### Kurzfristig (technisch)
+
+- **Docker-Image** für eine reproduzierbare Laufzeitumgebung und **Cloud-Deployment**
+  (z. B. Streamlit Cloud, Hugging Face Spaces). Für die aktuelle Kursabgabe wird die
+  App lokal über `uv run streamlit run app.py` ausgeführt.
+- **Erneuter YAMNet-Einsatz** als Qualitäts-Hebel für die Datenbereinigung
+  (siehe Phase 4) — die aktuelle librosa-Heuristik filtert gröber.
+- **Mehr und vielfältigere Daten**, insbesondere gegen die Überprädiktion von
+  Rotkehlchen und für die schwierige Background-Klasse (siehe Phase 6).
+
+### Langfristig (Vision)
+
+Ein größerer Schritt wäre die Ausweitung über Vögel hinaus auf weitere lautgebende
+Tierarten — etwa Insekten, Amphibien oder Säugetiere. Ein solches System ließe sich
+gezielt für Bildungszwecke aufbereiten und Schulen oder Naturschutzorganisationen
+zur Verfügung stellen. Besonders wirkungsvoll wäre eine **Gamification-Komponente**:
+Statt die erkannte Art direkt anzuzeigen, startet die App ein Quiz, bei dem Nutzer
+anhand des Tierlauts raten, welche Art zu hören ist. So würde aus einem technischen
+Klassifikationswerkzeug eine interaktive Lernplattform — geeignet für den Unterricht,
+aber auch für Wanderung, Urlaub oder Zoobesuch.
 

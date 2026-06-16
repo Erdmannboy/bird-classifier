@@ -42,7 +42,7 @@ erzwingen. Mehr als ein Machbarkeitsnachweis für drei Arten ist es bewusst nich
 Als Datenquelle haben wir die öffentliche Plattform **Xeno-Canto** genutzt, die
 tausende frei verfügbare Vogelaufnahmen enthält. Den Download haben wir über die
 Xeno-Canto-API mit dem Skript `bird_data.py` automatisiert und dabei gezielt nach
-Gesang in guter Qualität (`type:song q:A`) mit mindestens 20 Sekunden Länge gesucht.
+Gesang in guter Qualität (`type:song q:A`) mit mindestens 20 Sekunden Länge gesucht. (A: beste Qualität, E: schlechteste Qualität)
 
 Geladen haben wir die drei Zielarten – Amsel (Common Blackbird), Kohlmeise (Great Tit)
 und Rotkehlchen (European Robin) – sowie zusätzlich Taube, Krähe und Spatz, aus denen
@@ -225,3 +225,14 @@ wahrscheinlich am meisten bringen. Technisch hat uns BirdNET zusammen mit PyTorc
 zunächst Konflikte beschert, die wir über einen Subprozess gelöst haben. Und auch wenn
 wir den ML-Teil stark mit KI erarbeitet haben, haben wir gerade an den Daten- und
 Problemstellen viel darüber gelernt, worauf es bei so einem Projekt wirklich ankommt.
+
+Im Verlauf des Projekts wurde zunächst ein erstes Repository angelegt, das im Laufe der
+Entwicklung zunehmend unübersichtlich wurde. Aus diesem Grund wurde das Projekt in einem
+neuen, sauber strukturierten Repository neu aufgesetzt. Das alte Repository ist hier
+einsehbar: [LINK]
+
+## 10. Zukunftsperspektive
+
+
+Ein besonders interessanter Ansatz für die Weiterentwicklung wäre die Ausweitung des Systems über Vögel hinaus auf weitere Tierarten — etwa Insekten, Amphibien oder Säugetiere, die ebenfalls charakteristische Laute erzeugen. Ein solches System könnte dann gezielt für Bildungszwecke aufbereitet und beispielsweise Schulen oder Naturschutzorganisationen zur Verfügung gestellt werden.
+Besonders wirkungsvoll wäre dabei eine Gamification-Komponente: Anstatt die erkannte Art direkt anzuzeigen, könnte die App ein Quiz starten, bei dem Nutzer anhand des Tierlauts raten, welche Art zu hören ist. Ein solches Format macht das Lernen spielerisch und nachhaltig — und eignet sich hervorragend für den Einsatz im Unterricht, aber auch in der Freizeit, etwa beim Wandern, im Urlaub oder beim Besuch eines Zoos. Auf diese Weise würde aus einem technischen Klassifikationswerkzeug eine interaktive Lernplattform, die Jung und Alt für die Artenvielfalt begeistern kann.
