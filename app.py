@@ -296,17 +296,22 @@ st.set_page_config(
     page_title="Bird Classifier",
     page_icon="🐦",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown("""
 <style>
     #MainMenu, footer, header {visibility: hidden;}
-    /* Der Ausklapp-Pfeil der Sidebar sitzt im (versteckten) header — sonst lässt
-       sich die einmal eingeklappte Modell-Sidebar nicht wieder öffnen. Daher
-       diesen Button explizit wieder sichtbar machen. */
+    /* Modell-Sidebar dauerhaft ausgeklappt: Collapse-/Expand-Buttons entfernen und
+       die Sidebar sichtbar erzwingen, damit sie nie eingeklappt hängen bleibt. */
+    [data-testid="stSidebarCollapseButton"],
     [data-testid="stSidebarCollapsedControl"],
-    [data-testid="collapsedControl"] { visibility: visible !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
+    section[data-testid="stSidebar"] {
+        visibility: visible !important;
+        transform: none !important;
+        min-width: 244px !important;
+    }
     .main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }
 
     .hero {
