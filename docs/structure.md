@@ -9,7 +9,6 @@ bird-classifier/
 ├── pyproject.toml
 ├── uv.lock
 ├── setup_check.py
-├── CLAUDE.md
 │
 ├── models/
 │   ├── birdcnn_release_mit_yamnet.pth    ← Default, mit YAMNet (committed)
@@ -65,7 +64,6 @@ bird-classifier/
 | --- | --- |
 | `pyproject.toml` | Abhängigkeitsdefinition des UV-Projekts (numpy, librosa, torch, tensorflow/-hub, streamlit, birdnetlib u. a.). |
 | `uv.lock` | Reproduzierbares Lockfile — `uv sync` installiert exakt diese Versionen. |
-| `CLAUDE.md` | Schnellreferenz für Claude-Code-Sessions: Befehle, Konventionen, Do's & Don'ts. |
 | `project.md` | Ausführliche ML4B-Projektdokumentation auf Deutsch: Idee, Business Understanding, Daten, Modell, Ergebnisse, Reflexion. |
 
 ### Datenpipeline — `src/`
@@ -125,7 +123,6 @@ Spalten je CSV: `path`, `label`, `class_name`, `recording_id`.
 | CSV-Splits | `data_splits/` — **nicht committen** |
 | Modell-Checkpoints (`.pth`) | `models/` — die zwei Release-Modelle (`birdcnn_release_mit_yamnet.pth`, `birdcnn_release_ohne_yamnet.pth`) committed, eigene Trainings gitignored |
 | Projektdokumentation (Markdown) | `docs/` |
-| Konfiguration für Claude Code | `CLAUDE.md` im Root |
 
 > Große Binärdateien (Audiodaten, Modellgewichte > wenige MB) gehören nicht
 > ins Repository. Für Modell-Artefakte sollte langfristig ein Artefakt-Store
