@@ -15,7 +15,8 @@ import torch
 import torch.nn as nn
 
 
-MODEL_PATH = Path("model_best.pth")
+MODELS_DIR = Path(__file__).resolve().parent / "models"
+DEFAULT_MODEL = "birdcnn_release_mit_yamnet.pth"
 MODEL_CLASSES = ["Amsel", "Kohlmeise", "Rotkehlchen", "Background"]
 
 
@@ -67,15 +68,10 @@ def check_optional_package(package_name: str) -> bool:
     return importlib.util.find_spec(package_name) is not None
 
 
-def check_model_file() -> None:
-    if not MODEL_PATH.exists():
-        raise FileNotFoundError(
-            f"Modelldatei fehlt: {MODEL_PATH.resolve()}. "
-            "Die App erwartet model_best.pth im Projektordner."
-        )
-
+def load_and_check(model_path: Path) -> None:
+    """Lädt ein BirdCNN-State-Dict und prüft die Ausgabeform (1, 4)."""
     model = BirdCNN(num_classes=len(MODEL_CLASSES))
-    state_dict = torch.load(MODEL_PATH, map_location="cpu")
+    state_dict = torch.load(model_path, map_location="cpu")
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -86,9 +82,35 @@ def check_model_file() -> None:
     expected_shape = (1, len(MODEL_CLASSES))
     if tuple(output.shape) != expected_shape:
         raise RuntimeError(
-            f"Unerwartete Modell-Ausgabeform: {tuple(output.shape)}. "
+            f"Unerwartete Modell-Ausgabeform ({model_path.name}): {tuple(output.shape)}. "
             f"Erwartet: {expected_shape}."
         )
+
+
+def check_model_files() -> None:
+    if not MODELS_DIR.is_dir():
+        raise FileNotFoundError(
+            f"Modell-Ordner fehlt: {MODELS_DIR}. "
+            "Erwartet werden die Release-Modelle in models/."
+        )
+
+    models = sorted(MODELS_DIR.glob("*.pth"))
+    if not models:
+        raise FileNotFoundError(
+            f"Keine Modelldatei in {MODELS_DIR} gefunden. Erwartet wird mindestens "
+            f"{DEFAULT_MODEL}. Alternativ ein eigenes Modell über das Notebook trainieren."
+        )
+
+    default_path = MODELS_DIR / DEFAULT_MODEL
+    if not default_path.exists():
+        print(
+            f"Hinweis: Standard-Modell {DEFAULT_MODEL} fehlt — die App nutzt dann das "
+            f"erste verfügbare Modell oder BIRD_MODEL_PATH."
+        )
+
+    for model_path in models:
+        load_and_check(model_path)
+        print(f"Modell OK: {model_path.name}")
 
 
 def main() -> None:
@@ -113,10 +135,10 @@ def main() -> None:
     print(f"tensorflow installiert: {tensorflow_available}")
     print(f"tensorflow_hub installiert: {tensorflow_hub_available}")
 
-    check_model_file()
+    check_model_files()
 
     print("Setup ist korrekt.")
-    print("Modell konnte erfolgreich geladen werden.")
+    print("Alle gefundenen Modelle konnten erfolgreich geladen werden.")
 
 
 if __name__ == "__main__":

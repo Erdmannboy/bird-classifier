@@ -302,6 +302,11 @@ st.set_page_config(
 st.markdown("""
 <style>
     #MainMenu, footer, header {visibility: hidden;}
+    /* Der Ausklapp-Pfeil der Sidebar sitzt im (versteckten) header — sonst lässt
+       sich die einmal eingeklappte Modell-Sidebar nicht wieder öffnen. Daher
+       diesen Button explizit wieder sichtbar machen. */
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] { visibility: visible !important; }
     .main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }
 
     .hero {
