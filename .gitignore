@@ -13,10 +13,11 @@ data/**/*.wav
 data/**/*.WAV
 data_splits/*.csv
 
-# Modelle: nur das mitgelieferte Release-Modell wird committed.
+# Modelle: die beiden mitgelieferten Release-Modelle werden committed.
 # Selbst trainierte Checkpoints (birdcnn_<timestamp>_best.pth) bleiben lokal.
 models/*.pth
-!models/birdcnn_release.pth
+!models/birdcnn_release_mit_yamnet.pth
+!models/birdcnn_release_ohne_yamnet.pth
 
 # Alte Modell-Artefakte im Root (vor models/-Umstellung) nicht versehentlich committen
 /model_best.pth

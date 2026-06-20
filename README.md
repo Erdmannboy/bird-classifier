@@ -10,7 +10,7 @@ CNN-Vorhersage dem bekannten System BirdNET direkt gegenüber.
 
 ## Quickstart for Reviewers
 
-Dieses Repository enthält eine lauffähige Streamlit-App und ein bereits trainiertes Modell (`model_best.pth`). Die Trainingsdaten sind nicht enthalten, die App kann aber direkt gestartet werden.
+Dieses Repository enthält eine lauffähige Streamlit-App und zwei bereits trainierte Modelle im Ordner `models/` (`birdcnn_release_mit_yamnet.pth` und `birdcnn_release_ohne_yamnet.pth`, beide committed). Die Trainingsdaten sind nicht enthalten, die App kann aber direkt gestartet werden.
 
 Für die Installation siehe Abschnitt "Voraussetzungen" und "Installation".
 
@@ -26,7 +26,7 @@ Wichtig: Der Quickstart soll kompakt bleiben. Die ausführlichen Windows/macOS-B
 
 Nach dem Start der App kann eine WAV-Datei hochgeladen oder direkt im Browser eine Audioaufnahme erstellt werden. Die App wählt daraus ein 5-sekündiges Audiofenster aus, wandelt dieses in ein Mel-Spektrogramm um und sagt anschließend eine von vier Klassen vorher: Amsel, Kohlmeise, Rotkehlchen oder Background.
 
-Das trainierte Modell befindet sich als `model_best.pth` im Hauptverzeichnis des Projekts. Die ursprünglichen Trainingsdaten sind nicht im Repository enthalten, da sie zu groß sind und die Audiodateien den jeweiligen Lizenzen der Originalaufnahmen unterliegen. Die Datenpipeline kann mit den Skripten im Ordner `src/` nachvollzogen werden.
+Die trainierten Modelle liegen im Ordner `models/`. Mitgeliefert werden zwei Varianten, die sich nur in der Datenpipeline unterscheiden und in der App per Sidebar-Dropdown umschaltbar sind: `birdcnn_release_mit_yamnet.pth` (Background per YAMNet bereinigt, **empfohlen und Default**) und `birdcnn_release_ohne_yamnet.pth` (ältere Pipeline ohne YAMNet, nur zum Vergleich). Die ursprünglichen Trainingsdaten sind nicht im Repository enthalten, da sie zu groß sind und die Audiodateien den jeweiligen Lizenzen der Originalaufnahmen unterliegen. Die Datenpipeline kann mit den Skripten im Ordner `src/` nachvollzogen werden.
 
 ---
 
@@ -66,7 +66,7 @@ Für die Nutzung der Anwendung wird keine manuelle Installation einzelner Python
 
 - Python 3.11 oder neuer. Empfohlen ist Python 3.11, da die Projektumgebung über `.python-version` auf 3.11 festgelegt ist.
 - [uv](https://docs.astral.sh/uv/) (Python-Paketmanager) — `brew install uv` oder `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- `model_best.pth` im Projektordner (enthalten im Repository oder selbst trainiert)
+- Mindestens ein `.pth`-Modell in `models/` (zwei Modelle sind enthalten; eigene Trainings landen ebenfalls hier)
 - Für die reine Nutzung der App wird kein Xeno-Canto-API-Key benötigt
 - Für den Xeno-Canto-Download: kostenloser API-Key von [xeno-canto.org](https://xeno-canto.org) 
 - BirdNET-Vergleich (`birdnetlib`) ist standardmäßig in `uv sync` enthalten
@@ -135,7 +135,7 @@ uv run python setup_check.py
 
 ### App starten (Schnellstart)
 
-`model_best.pth` liegt bereits im Repo — die App ist sofort nutzbar:
+Beide Modelle liegen bereits im Repo — die App ist sofort nutzbar:
 
 ```bash
 uv run streamlit run app.py
@@ -144,6 +144,8 @@ uv run streamlit run app.py
 Der Browser öffnet sich automatisch. Du kannst eine WAV-Datei hochladen oder
 direkt aufnehmen. Mit dem Slider wählst du den 5-Sekunden-Ausschnitt;
 die App zeigt Mel-Spektrogramm, CNN-Vorhersage und (optional) BirdNET-Vergleich.
+Über das Dropdown in der Sidebar lässt sich zwischen dem YAMNet-Modell (Default)
+und der Variante ohne YAMNet umschalten.
 
 Alternativer Modell-Pfad via Umgebungsvariable:
 
@@ -153,12 +155,12 @@ BIRD_MODEL_PATH=/pfad/zu/modell.pth uv run streamlit run app.py
 ```
 - Windows PowerShell
   ```powershell
-  $env:BIRD_MODEL_PATH="C:\Pfad\zu\model_best.pth" uv run streamlit run app.py
+  $env:BIRD_MODEL_PATH="C:\Pfad\zu\modell.pth" uv run streamlit run app.py
   ```
 
 - Windows CMD
   ```cmd
-  set BIRD_MODEL_PATH=C:\Pfad\zu\model_best.pth
+  set BIRD_MODEL_PATH=C:\Pfad\zu\modell.pth
   uv run streamlit run app.py
   ```
 
@@ -184,8 +186,10 @@ uv run python src/build_dataset.py
 uv run jupyter lab notebooks/bird_training.ipynb
 ```
 
-Das Training speichert `model_best.pth` (bester Val-Checkpoint) und `model.pth`
-(finale Epoche) im Projektordner.
+Das Training speichert nur den besten Val-Checkpoint unter einem eindeutigen Namen
+`models/birdcnn_<timestamp>_best.pth` (gitignored). Die beiden mitgelieferten
+Release-Modelle werden dabei nie überschrieben; ein eigenes Modell wird bewusst
+zum Release, indem man es z. B. nach `models/birdcnn_release_mit_yamnet.pth` umbenennt.
 
 ---
 
@@ -202,7 +206,7 @@ bird-classifier/
 ├── data_splits/            # CSV-Splits (nicht committed)
 ├── docs/                   # Projektdokumentation
 ├── app.py                  # Streamlit-App
-├── model_best.pth          # Bestes Modell-Checkpoint
+├── models/                 # Modell-Artefakte (zwei Release-Modelle committed)
 ├── pyproject.toml          # Abhängigkeitsdefinition (UV)
 ├── uv.lock                 # Reproduzierbares Lockfile
 └── ...
@@ -228,11 +232,12 @@ Eigenes Convolutional Neural Network in PyTorch:
 
 - **Quelle:** [Xeno-Canto](https://xeno-canto.org) — freie Vogelgesang-Aufnahmen
 - **Arten:** Amsel, Kohlmeise, Rotkehlchen (Zielklassen) + Taube, Krähe, Spatz (Background)
-- **Clip-Länge:** 5 Sekunden WAV, 32 kHz / 16 kHz (Schnitt-Schritt)
-- **Datensatzgröße:** 12.629 Clips (Train 8.760 / Val 1.783 / Test 2.086)
-- **Split-Strategie:** Aufnahme-basiert (70 % / 15 % / 15 %, Seed=42) → kein Data Leakage
-- **Background-Erzeugung:** YAMNet bewertet jeden Clip; Hard Negatives (Score ≥ 0,40)
-  und normaler Hintergrund (Score ≥ 0,15) werden getrennt erfasst
+- **Clip-Länge:** 5 Sekunden WAV, 32 kHz
+- **Datensatzgröße (YAMNet-Pipeline):** 6.346 Clips (Train 3.797 / Val 1.585 / Test 964)
+- **Split-Strategie:** Aufnahme-basiert (70 % / 15 % / 15 %, fester Seed) → kein Data Leakage
+- **Background-Erzeugung:** YAMNet prüft pro Clip, ob ein Vogel hörbar ist (Maximum
+  über die Zeitfenster, ab Score 0,20). Zielart-Segmente ohne erkannten Vogel sowie
+  die bewusst geladenen Fremdvögel (Taube, Krähe, Spatz) bilden die Background-Klasse.
 
 Vollständige CRISP-DM-Dokumentation: → [docs/crisp-dm.md](docs/crisp-dm.md)
 
@@ -240,17 +245,34 @@ Vollständige CRISP-DM-Dokumentation: → [docs/crisp-dm.md](docs/crisp-dm.md)
 
 ## Evaluationsergebnisse
 
-Bewertet auf dem unberührten Test-Set (2.086 Clips):
+Empfohlenes Modell **`birdcnn_release_mit_yamnet.pth`**, bewertet auf dem unberührten
+Test-Set (964 Clips):
 
 | Klasse | Precision | Recall | F1 | Anzahl |
 |---|---|---|---|---|
-| Amsel | 0,949 | 0,936 | 0,943 | 580 |
-| Kohlmeise | 0,922 | 0,866 | 0,893 | 673 |
-| Rotkehlchen | 0,732 | 0,884 | 0,801 | 327 |
-| Background | 0,858 | 0,826 | 0,842 | 506 |
-| **Gesamt** | **0,884** | **0,879** | **0,880** | **2.086** |
+| Amsel | 0,753 | 0,936 | 0,834 | 78 |
+| Kohlmeise | 0,907 | 0,772 | 0,834 | 127 |
+| Rotkehlchen | 0,755 | 0,923 | 0,831 | 234 |
+| Background | 0,947 | 0,853 | 0,898 | 525 |
+| **Gesamt (weighted)** | **0,880** | **0,866** | **0,868** | **964** |
 
-**Test-Accuracy: 87,87 %** (Best-Val-Accuracy: 87,32 %)
+**Test-Accuracy: 86,62 %** · Best-Val-Accuracy 93,50 % (Epoche 8 von 20) ·
+ROC-AUC 0,96–0,99 je Klasse · ECE 0,098 (brauchbar kalibriert).
+
+### Modellvergleich: mit vs. ohne YAMNet
+
+Im Repo liegen zwei Modelle, die dieselbe BirdCNN-Architektur nutzen, aber auf
+unterschiedlich bereinigten Daten trainiert wurden:
+
+| Modell | Datenpipeline | Background-Quelle | Hinweis |
+|---|---|---|---|
+| `birdcnn_release_mit_yamnet.pth` ⭐ | mit YAMNet (`cut_audio.py`) | YAMNet-Score < 0,20 + Fremdvögel | empfohlen, ausgewogenes Per-Class-Profil, App-Default |
+| `birdcnn_release_ohne_yamnet.pth` | ältere Pipeline ohne YAMNet | librosa-Heuristik (Energieanteil > 1 kHz) | Legacy; auf dem YAMNet-Test-Set unausgewogen (z. B. Kohlmeise-Recall ≈ 0,52) |
+
+Das YAMNet-Modell ist die empfohlene Variante: Die erste, YAMNet-lose Version hatte
+das Problem, vor allem Rauschen zu „lernen". Erst die YAMNet-Bereinigung und die
+explizite Background-Klasse haben dieses Verhalten korrigiert. Das Legacy-Modell
+bleibt nur zum direkten Vergleich in der App erhalten.
 
 ---
 
@@ -271,7 +293,8 @@ uv run python setup_check.py
 
 - Nur drei Vogelarten erkennbar; alle anderen Arten landen in „Background"
 - Trainiert auf Studioqualität-Aufnahmen von Xeno-Canto — Feldaufnahmen können abweichen
-- Rotkehlchen hat die niedrigste Precision (0,732) — häufige Verwechslung mit Kohlmeise
+- Rotkehlchen wird tendenziell überschätzt (Precision 0,76); Kohlmeise hat den
+  schwächsten Recall (0,77) — beide werden am ehesten mit Background verwechselt
 - BirdNET und PyTorch laufen aus Kompatibilitätsgründen in getrennten Prozessen
 - Kein Docker-Image / kein Cloud-Deployment vorhanden
 
