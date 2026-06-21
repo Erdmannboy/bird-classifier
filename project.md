@@ -118,9 +118,9 @@ Originalaufnahme nie gleichzeitig in Train und Test – das verhindert Data Leak
 Ergebnis liegt als `train.csv`, `val.csv` und `test.csv` vor (mit Pfad, Klasse,
 Label und Aufnahme-ID).
 
-Am Ende hatten wir 8.760 Clips zum Trainieren, 1.783 für die Validierung und 2.086 für
-den Test (zusammen 12.629). Im Trainingsset verteilt sich das auf rund 1.888 Amsel,
-1.939 Kohlmeise, 2.203 Rotkehlchen und 2.730 Background.
+Am Ende hatten wir (YAMNet-Pipeline) 3.797 Clips zum Trainieren, 1.585 für die
+Validierung und 964 für den Test (zusammen 6.346). Im Trainingsset verteilt sich das
+auf 602 Amsel, 895 Kohlmeise, 838 Rotkehlchen und 1.462 Background.
 
 ## 6. Modeling
 
@@ -142,55 +142,82 @@ SpecAugment (Frequenz- und Zeit-Masking) zum Einsatz, um Overfitting zu reduzier
 Trainiert wurde über 20 Epochen mit Batch-Größe 32, CrossEntropy-Loss (Label Smoothing
 0.1), dem AdamW-Optimizer (lr = 1e-3, weight decay = 1e-4) und einem CosineAnnealing-
 Scheduler. Nach jeder Epoche haben wir auf der Validierung gemessen und jeweils das beste
-Modell als `model_best.pth` gespeichert; das finale Modell zusätzlich als `model.pth`.
+Modell unter einem eindeutigen Namen `models/birdcnn_<timestamp>_best.pth` gespeichert
+(so überschreibt ein neuer Lauf die mitgelieferten Release-Modelle nie). Es wird nur
+der beste Checkpoint gespeichert. Das hier dokumentierte, mitgelieferte Modell ist
+`models/birdcnn_release_mit_yamnet.pth` (bestes Val-Ergebnis 93,50 % in Epoche 8).
 
 ## 7. Evaluation
 
-Bewertet wird auf dem zuvor unberührten Test-Set (2.086 Clips). Ausgewählt wurde das
-Modell mit der besten Validation-Accuracy (87,32 %). Auf dem Test-Set erreicht es eine
-**Gesamt-Accuracy von 87,87 %**.
+Bewertet wird das empfohlene Modell `birdcnn_release_mit_yamnet.pth` auf dem zuvor
+unberührten Test-Set (964 Clips). Ausgewählt wurde der Checkpoint mit der besten
+Validation-Accuracy (93,50 % in Epoche 8). Auf dem Test-Set erreicht er eine
+**Gesamt-Accuracy von 86,62 %**.
 
 Pro Klasse sieht das so aus – Amsel wird mit Abstand am zuverlässigsten erkannt,
-Background ist am schwierigsten:
+Kohlmeise am schwächsten (Recall):
 
 ```
-Klasse         Accuracy   Anzahl
-Amsel           93.62 %     580
-Kohlmeise       86.63 %     673
-Rotkehlchen     88.38 %     327
-Background      82.61 %     506
+Klasse         Accuracy (= Recall)   Anzahl
+Amsel           93.59 %                78
+Kohlmeise       77.17 %               127
+Rotkehlchen     92.31 %               234
+Background      85.33 %               525
 ```
 
 Der Classification Report (Precision / Recall / F1):
 
 ```
               precision   recall   f1-score   support
-Amsel            0.949    0.936     0.943       580
-Kohlmeise        0.922    0.866     0.893       673
-Rotkehlchen      0.732    0.884     0.801       327
-Background       0.858    0.826     0.842       506
+Amsel            0.753    0.936     0.834        78
+Kohlmeise        0.907    0.772     0.834       127
+Rotkehlchen      0.755    0.923     0.831       234
+Background       0.947    0.853     0.898       525
 
-accuracy                            0.879      2086
-macro avg        0.865    0.878     0.870      2086
-weighted avg     0.884    0.879     0.880      2086
+accuracy                            0.866       964
+macro avg        0.841    0.871     0.849       964
+weighted avg     0.880    0.866     0.868       964
 ```
 
 Confusion Matrix (Zeilen = wahr, Spalten = vorhergesagt):
 
 ```
               Amsel  Kohlmeise  Rotkehlchen  Background
-Amsel          543       0          10           27
-Kohlmeise        6     583          63           21
-Rotkehlchen      1      16         289           21
-Background      22      33          33          418
+Amsel           73       0           3            2
+Kohlmeise        0      98          19           10
+Rotkehlchen      1       4         216           13
+Background      23       6          48          448
 ```
 
-**Interpretation:** Amsel läuft am besten. Die häufigste Verwechslung ist Kohlmeise →
-Rotkehlchen (63 Fälle), weshalb Rotkehlchen die niedrigste Precision (0,732) hat – das
-Modell sagt also "Rotkehlchen" tendenziell zu oft. Background ist die schwierigste
-Klasse und wird mit allen drei Vogelarten verwechselt, was bei einer so breiten
-"Restklasse" plausibel ist. Für ein selbst gebautes CNN auf vier Klassen ist das ein
+Zusätzlich (One-vs-Rest): **ROC-AUC** Amsel 0,989 · Kohlmeise 0,985 · Rotkehlchen 0,968 ·
+Background 0,963; **PR-AP** zwischen 0,881 und 0,972. Die Kalibrierung ist mit einem
+**ECE von 0,098** (bei Ø-Konfidenz 0,772) brauchbar.
+
+**Interpretation:** Amsel und Rotkehlchen werden gut getroffen. Rotkehlchen hat die
+niedrigste Precision (0,755) – das Modell sagt "Rotkehlchen" tendenziell zu oft, vor
+allem aus der Background-Klasse (48 Fälle) und aus Kohlmeise (19). Kohlmeise hat den
+schwächsten Recall (0,772). Background ist die breite "Restklasse", aus der Fehler in
+die Vogelarten überlaufen. Für ein selbst gebautes CNN auf vier Klassen ist das ein
 solides Ergebnis.
+
+### Vergleich: mit vs. ohne YAMNet
+
+Im Repo liegen zwei mitgelieferte Modelle mit identischer BirdCNN-Architektur, die sich
+nur in der Datenpipeline unterscheiden:
+
+- **`birdcnn_release_mit_yamnet.pth`** (empfohlen, App-Default): Background mit YAMNet
+  bereinigt; die oben dokumentierten Werte (86,62 % Test-Accuracy, ausgewogenes
+  Per-Class-Profil) sind über `notebooks/bird_training.ipynb` reproduzierbar.
+- **`birdcnn_release_ohne_yamnet.pth`** (Legacy): das ältere Modell der ursprünglichen
+  Pipeline, in der die Background-Clips noch über eine librosa-Heuristik (Energieanteil
+  oberhalb 1 kHz) statt über YAMNet erzeugt wurden. Auf dem heutigen, YAMNet-gefilterten
+  Test-Set wirkt es unausgewogen (z. B. Kohlmeise-Recall ≈ 0,52), weil es auf anders
+  definierten Background-Daten trainiert wurde. Es bleibt nur zum direkten Vergleich in
+  der App erhalten.
+
+Der Wechsel von der librosa-Heuristik zu YAMNet (plus der expliziten Background-Klasse)
+war der entscheidende Schritt: Die erste Version hatte vor allem Rauschen "gelernt",
+erst die YAMNet-Bereinigung hat dieses Verhalten korrigiert.
 
 ## 8. Deployment
 
@@ -202,7 +229,7 @@ uv run streamlit run app.py
 
 In der App kann man eine WAV-Datei hochladen oder live aufnehmen, sieht das
 Mel-Spektrogramm, wählt einen 5-Sekunden-Ausschnitt und bekommt die Vorhersage unseres
-eigenen CNN (`model_best.pth`) – die Klasse "Background" wird dabei als "Kein Vogel"
+eigenen CNN (Default `models/birdcnn_release_mit_yamnet.pth`) – die Klasse "Background" wird dabei als "Kein Vogel"
 angezeigt. Zusätzlich wird dieselbe Aufnahme von BirdNET analysiert und das Ergebnis
 gegenübergestellt. BirdNET läuft bewusst in einem eigenen Subprozess, weil sich PyTorch
 und TensorFlow-Lite sonst in die Quere kommen. Wird eine der drei Zielarten erkannt,
