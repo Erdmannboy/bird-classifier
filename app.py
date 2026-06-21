@@ -46,29 +46,35 @@ BIRDNET_SCIENTIFIC_TO_LOCAL = {
     "Erithacus rubecula": "Rotkehlchen",
 }
 
-# Modelle liegen in models/. Das mitgelieferte Modell heisst birdcnn_release.pth
-# (committed). Selbst trainierte Checkpoints (birdcnn_<timestamp>_best.pth) landen
-# ebenfalls hier und sind in der Auswahl waehlbar. BIRD_MODEL_PATH ueberschreibt die
-# Auswahl mit einem festen Pfad (z. B. fuer Tests/Deployment).
+# Modelle liegen in models/. Mitgeliefert (committed) werden zwei Release-Modelle,
+# die sich nur in der Datenpipeline unterscheiden und im Dropdown umschaltbar sind:
+#   birdcnn_release_mit_yamnet.pth  → Background per YAMNet bereinigt (empfohlen, Default)
+#   birdcnn_release_ohne_yamnet.pth → ältere Pipeline ohne YAMNet (librosa-Heuristik)
+# Selbst trainierte Checkpoints (birdcnn_<timestamp>_best.pth) landen ebenfalls hier
+# und sind waehlbar. BIRD_MODEL_PATH ueberschreibt die Auswahl mit einem festen Pfad.
 MODELS_DIR = Path(__file__).resolve().parent / "models"
-RELEASE_MODEL = "birdcnn_release.pth"
+DEFAULT_MODEL = "birdcnn_release_mit_yamnet.pth"
+MODEL_LABELS = {
+    "birdcnn_release_mit_yamnet.pth": "BirdCNN · mit YAMNet  ⭐ (empfohlen)",
+    "birdcnn_release_ohne_yamnet.pth": "BirdCNN · ohne YAMNet (Legacy)",
+}
 ENV_MODEL_PATH = os.environ.get("BIRD_MODEL_PATH")
 
 
 def discover_models() -> list[Path]:
-    """Alle .pth in models/ — Release zuerst, danach neueste zuerst."""
+    """Alle .pth in models/ — empfohlenes Modell zuerst, danach neueste zuerst."""
     if not MODELS_DIR.is_dir():
         return []
     paths = list(MODELS_DIR.glob("*.pth"))
     return sorted(
         paths,
-        key=lambda p: (0 if p.name == RELEASE_MODEL else 1, -p.stat().st_mtime),
+        key=lambda p: (0 if p.name == DEFAULT_MODEL else 1, -p.stat().st_mtime),
     )
 
 
 def model_label(p: Path) -> str:
-    """Anzeigename in der Modell-Auswahl."""
-    return f"{p.stem}  (Release)" if p.name == RELEASE_MODEL else p.stem
+    """Anzeigename im Dropdown."""
+    return MODEL_LABELS.get(p.name, p.stem)
 
 TARGET_SR = 32000
 TARGET_DURATION = 5.0
@@ -395,6 +401,16 @@ st.set_page_config(
 st.markdown("""
 <style>
     #MainMenu, footer, header {visibility: hidden;}
+    /* Modell-Sidebar dauerhaft ausgeklappt: Collapse-/Expand-Buttons entfernen und
+       die Sidebar sichtbar erzwingen, damit sie nie eingeklappt hängen bleibt. */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] { display: none !important; }
+    section[data-testid="stSidebar"] {
+        visibility: visible !important;
+        transform: none !important;
+        min-width: 244px !important;
+    }
     .main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }
 
     /* Theme-adaptive Farben — funktionieren in Light- UND Dark-Mode */
@@ -607,7 +623,7 @@ else:
         )
     else:
         # Kein Modell gefunden — Fallback-Pfad fuer eine klare Fehlermeldung.
-        selected_path = str(MODELS_DIR / RELEASE_MODEL)
+        selected_path = str(MODELS_DIR / DEFAULT_MODEL)
 
 try:
     model = load_model(selected_path)
@@ -621,7 +637,7 @@ if model is None:
         f"Mein Modell konnte nicht geladen werden.\n\n"
         f"Pfad: `{selected_path}`\n\n"
         f"Fehler: `{model_error}`\n\n"
-        f"Erwartet wird `models/{RELEASE_MODEL}`. Trainiere alternativ das Notebook "
+        f"Erwartet wird `models/{DEFAULT_MODEL}`. Trainiere alternativ das Notebook "
         f"`notebooks/bird_training.ipynb` durch — das legt einen Checkpoint in `models/` ab."
     )
     st.stop()

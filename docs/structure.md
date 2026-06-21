@@ -9,10 +9,10 @@ bird-classifier/
 ├── pyproject.toml
 ├── uv.lock
 ├── setup_check.py
-├── CLAUDE.md
 │
 ├── models/
-│   └── birdcnn_release.pth   ← mitgeliefert (weitere Checkpoints gitignored)
+│   ├── birdcnn_release_mit_yamnet.pth    ← Default, mit YAMNet (committed)
+│   └── birdcnn_release_ohne_yamnet.pth   ← Legacy, ohne YAMNet (committed)
 │
 ├── data/
 │   └── .gitkeep
@@ -35,9 +35,9 @@ bird-classifier/
 
 > `data/` und `data_splits/` sind gitignored und enthalten lokal die Rohdaten
 > bzw. die CSV-Splits. Im Repository liegt jeweils nur ein `.gitkeep`.
-> Modelle liegen in `models/`. Committet wird nur das mitgelieferte
-> `birdcnn_release.pth`; selbst trainierte Checkpoints (`birdcnn_<timestamp>_best.pth`)
-> sind gitignored.
+> Modelle liegen in `models/`. Committet werden die beiden mitgelieferten
+> Release-Modelle (`birdcnn_release_mit_yamnet.pth`, `birdcnn_release_ohne_yamnet.pth`);
+> selbst trainierte Checkpoints (`birdcnn_<timestamp>_best.pth`) sind gitignored.
 
 ---
 
@@ -47,14 +47,15 @@ bird-classifier/
 
 | Pfad | Zweck |
 | --- | --- |
-| `app.py` | Streamlit-Web-App. Lädt standardmäßig `models/birdcnn_release.pth` (per Sidebar-Dropdown ist jedes weitere `models/*.pth` wählbar), nimmt eine WAV-Datei entgegen (Upload oder Live-Aufnahme), zeigt Mel-Spektrogramm mit wählbarem 5-s-Ausschnitt, gibt CNN-Vorhersage und optionalen BirdNET-Vergleich aus. Einstiegspunkt: `streamlit run app.py`. |
+| `app.py` | Streamlit-Web-App. Lädt standardmäßig `models/birdcnn_release_mit_yamnet.pth` (per Sidebar-Dropdown sind das zweite Release-Modell und jedes weitere `models/*.pth` wählbar), nimmt eine WAV-Datei entgegen (Upload oder Live-Aufnahme), zeigt Mel-Spektrogramm mit wählbarem 5-s-Ausschnitt, gibt CNN-Vorhersage und optionalen BirdNET-Vergleich aus. Einstiegspunkt: `streamlit run app.py`. |
 | `setup_check.py` | Einfacher Umgebungstest: gibt Python-Version und Versionsnummern der wichtigsten Bibliotheken aus. Kein Unittest-Framework, nur manueller Smoke-Test. |
 
 ### Modell-Artefakte (`models/`)
 
 | Pfad | Zweck |
 | --- | --- |
-| `models/birdcnn_release.pth` | Mitgeliefertes BirdCNN-State-Dict (committed). Wird von `app.py` standardmäßig geladen. |
+| `models/birdcnn_release_mit_yamnet.pth` | Mitgeliefertes BirdCNN-State-Dict, Daten mit YAMNet bereinigt (committed). App-Default. |
+| `models/birdcnn_release_ohne_yamnet.pth` | Mitgeliefertes BirdCNN-State-Dict der älteren Pipeline ohne YAMNet (committed). Nur zum Vergleich, per Dropdown wählbar. |
 | `models/birdcnn_<timestamp>_best.pth` | Selbst trainierte Checkpoints (bester Val-Wert pro Lauf). Gitignored; in der App per Dropdown wählbar. |
 
 ### Konfiguration & Doku
@@ -63,7 +64,6 @@ bird-classifier/
 | --- | --- |
 | `pyproject.toml` | Abhängigkeitsdefinition des UV-Projekts (numpy, librosa, torch, tensorflow/-hub, streamlit, birdnetlib u. a.). |
 | `uv.lock` | Reproduzierbares Lockfile — `uv sync` installiert exakt diese Versionen. |
-| `CLAUDE.md` | Schnellreferenz für Claude-Code-Sessions: Befehle, Konventionen, Do's & Don'ts. |
 | `project.md` | Ausführliche ML4B-Projektdokumentation auf Deutsch: Idee, Business Understanding, Daten, Modell, Ergebnisse, Reflexion. |
 
 ### Datenpipeline — `src/`
@@ -98,9 +98,9 @@ in dem Art, Pfade und Schwellwerte angepasst werden.
 | Pfad | Zweck |
 | --- | --- |
 | `data_splits/` | CSV-Dateien mit Pfad, Klasse, Label und Aufnahme-ID pro Clip. Nicht committed (nur `.gitkeep`). |
-| `data_splits/train.csv` | Trainingsdaten (≈ 70 % der Aufnahmen, 8.760 Clips). |
-| `data_splits/val.csv` | Validierungsdaten (≈ 15 % der Aufnahmen, 1.783 Clips). |
-| `data_splits/test.csv` | Testdaten (≈ 15 % der Aufnahmen, 2.086 Clips). |
+| `data_splits/train.csv` | Trainingsdaten (≈ 70 % der Aufnahmen, 3.797 Clips). |
+| `data_splits/val.csv` | Validierungsdaten (≈ 15 % der Aufnahmen, 1.585 Clips). |
+| `data_splits/test.csv` | Testdaten (≈ 15 % der Aufnahmen, 964 Clips). |
 
 Spalten je CSV: `path`, `label`, `class_name`, `recording_id`.
 
@@ -121,9 +121,8 @@ Spalten je CSV: `path`, `label`, `class_name`, `recording_id`.
 | Jupyter-Notebooks | `notebooks/` |
 | Rohdaten (MP3, WAV) | `data/<Klasse>/files/` bzw. `data/<Klasse>/clips/` — **nicht committen** |
 | CSV-Splits | `data_splits/` — **nicht committen** |
-| Modell-Checkpoints (`.pth`) | `models/` — nur `birdcnn_release.pth` committed |
+| Modell-Checkpoints (`.pth`) | `models/` — die zwei Release-Modelle (`birdcnn_release_mit_yamnet.pth`, `birdcnn_release_ohne_yamnet.pth`) committed, eigene Trainings gitignored |
 | Projektdokumentation (Markdown) | `docs/` |
-| Konfiguration für Claude Code | `CLAUDE.md` im Root |
 
 > Große Binärdateien (Audiodaten, Modellgewichte > wenige MB) gehören nicht
 > ins Repository. Für Modell-Artefakte sollte langfristig ein Artefakt-Store
