@@ -89,33 +89,33 @@ HOP_LENGTH = 512
 # ======================================
 
 METRICS = {
-    "test_acc": 87.87,
-    "val_acc": 87.32,
-    "n_train": 8760,
-    "n_val": 1783,
-    "n_test": 2086,
-    "n_total": 12629,
+    "test_acc": 86.62,
+    "val_acc": 93.50,
+    "n_train": 3797,
+    "n_val": 1585,
+    "n_test": 964,
+    "n_total": 6346,
     "epochs": 20,
     "batch_size": 32,
 }
 
 # Pro Klasse: Accuracy %, Support, Precision, Recall, F1 (aus project.md, Abschnitt 7)
 PER_CLASS = {
-    "Amsel":       {"acc": 93.62, "support": 580, "precision": 0.949, "recall": 0.936, "f1": 0.943},
-    "Kohlmeise":   {"acc": 86.63, "support": 673, "precision": 0.922, "recall": 0.866, "f1": 0.893},
-    "Rotkehlchen": {"acc": 88.38, "support": 327, "precision": 0.732, "recall": 0.884, "f1": 0.801},
-    "Background":  {"acc": 82.61, "support": 506, "precision": 0.858, "recall": 0.826, "f1": 0.842},
+    "Amsel":       {"acc": 93.59, "support": 78,  "precision": 0.753, "recall": 0.936, "f1": 0.834},
+    "Kohlmeise":   {"acc": 77.17, "support": 127, "precision": 0.907, "recall": 0.772, "f1": 0.834},
+    "Rotkehlchen": {"acc": 92.31, "support": 234, "precision": 0.755, "recall": 0.923, "f1": 0.831},
+    "Background":  {"acc": 85.33, "support": 525, "precision": 0.947, "recall": 0.853, "f1": 0.898},
 }
 
-MACRO_AVG = {"precision": 0.865, "recall": 0.878, "f1": 0.870}
-WEIGHTED_AVG = {"precision": 0.884, "recall": 0.879, "f1": 0.880}
+MACRO_AVG = {"precision": 0.841, "recall": 0.871, "f1": 0.849}
+WEIGHTED_AVG = {"precision": 0.880, "recall": 0.866, "f1": 0.868}
 
 # Confusion Matrix (Zeilen = wahr, Spalten = vorhergesagt), Reihenfolge = MODEL_CLASSES
 CONFUSION_MATRIX = np.array([
-    [543,   0,  10,  27],
-    [  6, 583,  63,  21],
-    [  1,  16, 289,  21],
-    [ 22,  33,  33, 418],
+    [73,  0,   3,   2],
+    [ 0, 98,  19,  10],
+    [ 1,  4, 216,  13],
+    [23,  6,  48, 448],
 ])
 
 # ======================================
@@ -666,7 +666,7 @@ def render_model_insights():
         f"Train {METRICS['n_train']:,} · Val {METRICS['n_val']:,} · Test {METRICS['n_test']:,}"
     ).replace(",", ".")
     metric_cards = [
-        ("Test-Accuracy", f"{METRICS['test_acc']:.2f} %", "2.086 ungesehene Clips", "#27ae60"),
+        ("Test-Accuracy", f"{METRICS['test_acc']:.2f} %", f"{METRICS['n_test']:,} ungesehene Clips".replace(",", "."), "#27ae60"),
         ("Val-Accuracy", f"{METRICS['val_acc']:.2f} %", "bester Checkpoint", "#667eea"),
         ("Klassen", "4", "3 Vögel + Background", "#16a085"),
         ("Clips gesamt", n_total, split_sub, "#e67e22"),
