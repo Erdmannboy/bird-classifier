@@ -1,5 +1,5 @@
 # Screencast
-[Screencast ansehen](https://github.com/Erdmannboy/bird-classifier/releases/download/v1.0/ML4B_BirdNET_Screencast.mp4)
+[Screencast ansehen]([https://github.com/Erdmannboy/bird-classifier/releases/tag/1.0])
 
 # Bird Species Classifier
 
