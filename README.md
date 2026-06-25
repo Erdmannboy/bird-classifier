@@ -1,3 +1,6 @@
+# Screencast
+[Screencast ansehen](https://github.com/Erdmannboy/bird-classifier/releases/download/v1.0/ML4B_BirdNET_Screencast.mp4)
+
 # Bird Species Classifier
 
 Ein Proof-of-Concept-System zur automatischen Erkennung von Vogelgesang aus kurzen
