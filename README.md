@@ -1,3 +1,6 @@
+# Screencast
+[Screencast ansehen](https://github.com/Erdmannboy/bird-classifier/releases/tag/1.0)
+
 # Bird Species Classifier
 
 Ein Proof-of-Concept-System zur automatischen Erkennung von Vogelgesang aus kurzen
